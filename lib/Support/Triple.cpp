@@ -60,6 +60,7 @@ const char *Triple::getArchTypeName(ArchType Kind) {
   case spir64:      return "spir64";
   case kalimba:     return "kalimba";
   case shave:       return "shave";
+  case vanilla:     return "vanilla";
   case wasm32:      return "wasm32";
   case wasm64:      return "wasm64";
   }
@@ -1017,6 +1018,7 @@ static unsigned getArchPointerBitWidth(llvm::Triple::ArchType Arch) {
   case llvm::Triple::spir:
   case llvm::Triple::kalimba:
   case llvm::Triple::shave:
+  case llvm::Triple::vanilla:
   case llvm::Triple::wasm32:
     return 32;
 
