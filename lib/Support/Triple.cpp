@@ -1094,6 +1094,7 @@ Triple Triple::get32BitArchVariant() const {
   case Triple::xcore:
   case Triple::shave:
   case Triple::wasm32:
+  case Triple::vanilla:
     // Already 32-bit.
     break;
 
@@ -1128,6 +1129,7 @@ Triple Triple::get64BitArchVariant() const {
   case Triple::xcore:
   case Triple::sparcel:
   case Triple::shave:
+  case Triple::vanilla:
     T.setArch(UnknownArch);
     break;
 
@@ -1192,6 +1194,7 @@ Triple Triple::getBigEndianArchVariant() const {
   case Triple::x86:
   case Triple::x86_64:
   case Triple::xcore:
+  case Triple::vanilla:
 
   // ARM is intentionally unsupported here, changing the architecture would
   // drop any arch suffixes.
@@ -1270,6 +1273,7 @@ Triple Triple::getLittleEndianArchVariant() const {
   case Triple::x86:
   case Triple::x86_64:
   case Triple::xcore:
+      case Triple::vanilla:
     // Already little endian.
     break;
 
