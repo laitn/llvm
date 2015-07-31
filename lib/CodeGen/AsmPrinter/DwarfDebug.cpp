@@ -187,9 +187,9 @@ const DIType *DbgVariable::getType() const {
     if (tag == dwarf::DW_TAG_pointer_type)
       subType = resolve(cast<DIDerivedType>(Ty)->getBaseType());
 
-    auto Elements = cast<DICompositeTypeBase>(subType)->getElements();
+    auto Elements = cast<DICompositeType>(subType)->getElements();
     for (unsigned i = 0, N = Elements.size(); i < N; ++i) {
-      auto *DT = cast<DIDerivedTypeBase>(Elements[i]);
+      auto *DT = cast<DIDerivedType>(Elements[i]);
       if (getName() == DT->getName())
         return resolve(DT->getBaseType());
     }
@@ -1156,7 +1156,7 @@ void DwarfDebug::beginFunction(const MachineFunction *MF) {
     // The first mention of a function argument gets the CurrentFnBegin
     // label, so arguments are visible when breaking at function entry.
     const DILocalVariable *DIVar = Ranges.front().first->getDebugVariable();
-    if (DIVar->getTag() == dwarf::DW_TAG_arg_variable &&
+    if (DIVar->isParameter() &&
         getDISubprogram(DIVar->getScope())->describes(MF->getFunction())) {
       LabelsBeforeInsn[Ranges.front().first] = Asm->getFunctionBegin();
       if (Ranges.front().first->getDebugExpression()->isBitPiece()) {
