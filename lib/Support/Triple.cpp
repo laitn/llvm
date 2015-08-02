@@ -97,6 +97,8 @@ const char *Triple::getArchTypePrefix(ArchType Kind) {
 
   case bpfel:
   case bpfeb:       return "bpf";
+      
+  case vanilla:   return "vanilla";
 
   case sparcv9:
   case sparcel:
@@ -263,6 +265,7 @@ Triple::ArchType Triple::getArchTypeForLLVMName(StringRef Name) {
     .Case("shave", shave)
     .Case("wasm32", wasm32)
     .Case("wasm64", wasm64)
+    .Case("vanilla",vanilla)
     .Default(UnknownArch);
 }
 
@@ -370,6 +373,7 @@ static Triple::ArchType parseArch(StringRef ArchName) {
     .Case("shave", Triple::shave)
     .Case("wasm32", Triple::wasm32)
     .Case("wasm64", Triple::wasm64)
+    .Case("vanilla", Triple::vanilla)
     .Default(Triple::UnknownArch);
 }
 
@@ -1275,7 +1279,7 @@ Triple Triple::getLittleEndianArchVariant() const {
   case Triple::x86:
   case Triple::x86_64:
   case Triple::xcore:
-      case Triple::vanilla:
+  case Triple::vanilla:
     // Already little endian.
     break;
 
