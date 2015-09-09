@@ -275,7 +275,7 @@ INITIALIZE_PASS_BEGIN(RegisterCoalescer, "simple-register-coalescing",
 INITIALIZE_PASS_DEPENDENCY(LiveIntervals)
 INITIALIZE_PASS_DEPENDENCY(SlotIndexes)
 INITIALIZE_PASS_DEPENDENCY(MachineLoopInfo)
-INITIALIZE_AG_DEPENDENCY(AliasAnalysis)
+INITIALIZE_PASS_DEPENDENCY(AAResultsWrapperPass)
 INITIALIZE_PASS_END(RegisterCoalescer, "simple-register-coalescing",
                     "Simple Register Coalescing", false, false)
 
@@ -453,7 +453,7 @@ bool CoalescerPair::isCoalescable(const MachineInstr *MI) const {
 
 void RegisterCoalescer::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.setPreservesCFG();
-  AU.addRequired<AliasAnalysis>();
+  AU.addRequired<AAResultsWrapperPass>();
   AU.addRequired<LiveIntervals>();
   AU.addPreserved<LiveIntervals>();
   AU.addPreserved<SlotIndexes>();
@@ -1822,7 +1822,7 @@ public:
 
   /// Removes subranges starting at copies that get removed. This sometimes
   /// happens when undefined subranges are copied around. These ranges contain
-  /// no usefull information and can be removed.
+  /// no useful information and can be removed.
   void pruneSubRegValues(LiveInterval &LI, unsigned &ShrinkMask);
 
   /// Erase any machine instructions that have been coalesced away.
@@ -2410,7 +2410,7 @@ void JoinVals::pruneSubRegValues(LiveInterval &LI, unsigned &ShrinkMask)
         continue;
       }
       // If a subrange ends at the copy, then a value was copied but only
-      // partially used later. Shrink the subregister range apropriately.
+      // partially used later. Shrink the subregister range appropriately.
       if (Q.valueIn() != nullptr && Q.valueOut() == nullptr) {
         DEBUG(dbgs() << "\t\tDead uses at sublane "
                      << format("%04X", S.LaneMask) << " at " << Def << "\n");
@@ -2799,7 +2799,7 @@ bool RegisterCoalescer::applyTerminalRule(const MachineInstr &Copy) const {
       !isTerminalReg(DstReg, Copy, MRI))
     return false;
 
-  // DstReg is a terminal node. Check if it inteferes with any other
+  // DstReg is a terminal node. Check if it interferes with any other
   // copy involving SrcReg.
   const MachineBasicBlock *OrigBB = Copy.getParent();
   const LiveInterval &DstLI = LIS->getInterval(DstReg);
@@ -2943,7 +2943,7 @@ bool RegisterCoalescer::runOnMachineFunction(MachineFunction &fn) {
   TRI = STI.getRegisterInfo();
   TII = STI.getInstrInfo();
   LIS = &getAnalysis<LiveIntervals>();
-  AA = &getAnalysis<AliasAnalysis>();
+  AA = &getAnalysis<AAResultsWrapperPass>().getAAResults();
   Loops = &getAnalysis<MachineLoopInfo>();
   if (EnableGlobalCopies == cl::BOU_UNSET)
     JoinGlobalCopies = STI.enableJoinGlobalCopies();

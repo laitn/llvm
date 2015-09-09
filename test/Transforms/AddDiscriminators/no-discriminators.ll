@@ -48,12 +48,12 @@ attributes #1 = { nounwind readnone }
 !llvm.module.flags = !{!10, !11}
 !llvm.ident = !{!12}
 
-!0 = !DICompileUnit(language: DW_LANG_C99, producer: "clang version 3.5.0 ", isOptimized: false, emissionKind: 1, file: !1, enums: !2, retainedTypes: !2, subprograms: !3, globals: !2, imports: !2)
+!0 = distinct !DICompileUnit(language: DW_LANG_C99, producer: "clang version 3.5.0 ", isOptimized: false, emissionKind: 1, file: !1, enums: !2, retainedTypes: !2, subprograms: !3, globals: !2, imports: !2)
 !1 = !DIFile(filename: "no-discriminators", directory: ".")
 !2 = !{}
 !3 = !{!4}
-!4 = !DISubprogram(name: "foo", line: 1, isLocal: false, isDefinition: true, virtualIndex: 6, flags: DIFlagPrototyped, isOptimized: false, scopeLine: 1, file: !1, scope: !5, type: !6, function: i32 (i64)* @foo, variables: !2)
-; CHECK: ![[FOO:[0-9]+]] = !DISubprogram(name: "foo"
+!4 = distinct !DISubprogram(name: "foo", line: 1, isLocal: false, isDefinition: true, virtualIndex: 6, flags: DIFlagPrototyped, isOptimized: false, scopeLine: 1, file: !1, scope: !5, type: !6, function: i32 (i64)* @foo, variables: !2)
+; CHECK: ![[FOO:[0-9]+]] = distinct !DISubprogram(name: "foo"
 !5 = !DIFile(filename: "no-discriminators", directory: ".")
 !6 = !DISubroutineType(types: !7)
 !7 = !{!8, !9}

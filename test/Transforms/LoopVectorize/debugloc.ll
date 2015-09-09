@@ -12,9 +12,9 @@ target datalayout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f3
 ; CHECK:   load <2 x i32>, <2 x i32>* {{.*}}, !dbg ![[LOC2]]
 ; CHECK:   add <2 x i32> {{.*}}, !dbg ![[LOC2]]
 ; CHECK:   add i64 %index, 2, !dbg ![[LOC]]
-; CHECK:   icmp eq i64 %index.next, %end.idx.rnd.down, !dbg ![[LOC]]
+; CHECK:   icmp eq i64 %index.next, %n.vec, !dbg ![[LOC]]
 ; CHECK: middle.block
-; CHECK:   add <2 x i32> %rdx.vec.exit.phi, %rdx.shuf, !dbg ![[LOC2]]
+; CHECK:   add <2 x i32> %{{.*}}, %rdx.shuf, !dbg ![[LOC2]]
 ; CHECK:   extractelement <2 x i32> %bin.rdx, i32 0, !dbg ![[LOC2]]
 
 define i32 @f(i32* nocapture %a, i32 %size) #0 {
@@ -63,11 +63,11 @@ attributes #1 = { nounwind readnone }
 !llvm.dbg.cu = !{!0}
 !llvm.module.flags = !{!18, !27}
 
-!0 = !DICompileUnit(language: DW_LANG_C99, producer: "clang version 3.4 (trunk 185038) (llvm/trunk 185097)", isOptimized: true, emissionKind: 0, file: !1, enums: !2, retainedTypes: !2, subprograms: !3, globals: !2, imports: !2)
+!0 = distinct !DICompileUnit(language: DW_LANG_C99, producer: "clang version 3.4 (trunk 185038) (llvm/trunk 185097)", isOptimized: true, emissionKind: 0, file: !1, enums: !2, retainedTypes: !2, subprograms: !3, globals: !2, imports: !2)
 !1 = !DIFile(filename: "-", directory: "/Volumes/Data/backedup/dev/os/llvm/debug")
 !2 = !{}
 !3 = !{!4}
-!4 = !DISubprogram(name: "f", line: 3, isLocal: false, isDefinition: true, virtualIndex: 6, flags: DIFlagPrototyped, isOptimized: true, scopeLine: 3, file: !5, scope: !6, type: !7, function: i32 (i32*, i32)* @f, variables: !12)
+!4 = distinct !DISubprogram(name: "f", line: 3, isLocal: false, isDefinition: true, virtualIndex: 6, flags: DIFlagPrototyped, isOptimized: true, scopeLine: 3, file: !5, scope: !6, type: !7, function: i32 (i32*, i32)* @f, variables: !12)
 !5 = !DIFile(filename: "<stdin>", directory: "/Volumes/Data/backedup/dev/os/llvm/debug")
 !6 = !DIFile(filename: "<stdin>", directory: "/Volumes/Data/backedup/dev/os/llvm/debug")
 !7 = !DISubroutineType(types: !8)

@@ -98,11 +98,11 @@ attributes #4 = { nounwind readonly }
 !llvm.module.flags = !{!25, !42}
 !llvm.ident = !{!26}
 
-!0 = !DICompileUnit(language: DW_LANG_C_plus_plus, producer: "clang version 3.4 (trunk 192896) (llvm/trunk 192895)", isOptimized: true, emissionKind: 0, file: !1, enums: !2, retainedTypes: !2, subprograms: !3, globals: !2, imports: !2)
+!0 = distinct !DICompileUnit(language: DW_LANG_C_plus_plus, producer: "clang version 3.4 (trunk 192896) (llvm/trunk 192895)", isOptimized: true, emissionKind: 0, file: !1, enums: !2, retainedTypes: !2, subprograms: !3, globals: !2, imports: !2)
 !1 = !DIFile(filename: "branch.cc", directory: ".")
 !2 = !{}
 !3 = !{!4}
-!4 = !DISubprogram(name: "main", line: 4, isLocal: false, isDefinition: true, virtualIndex: 6, flags: DIFlagPrototyped, isOptimized: true, scopeLine: 4, file: !1, scope: !5, type: !6, function: i32 (i32, i8**)* @main, variables: !12)
+!4 = distinct !DISubprogram(name: "main", line: 4, isLocal: false, isDefinition: true, virtualIndex: 6, flags: DIFlagPrototyped, isOptimized: true, scopeLine: 4, file: !1, scope: !5, type: !6, function: i32 (i32, i8**)* @main, variables: !12)
 !5 = !DIFile(filename: "branch.cc", directory: ".")
 !6 = !DISubroutineType(types: !7)
 !7 = !{!8, !8, !9}

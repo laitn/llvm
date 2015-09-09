@@ -571,6 +571,11 @@ PPCInstrInfo::commuteInstruction(MachineInstr *MI, bool NewMI) const {
   unsigned MB = MI->getOperand(4).getImm();
   unsigned ME = MI->getOperand(5).getImm();
 
+  // We can't commute a trivial mask (there is no way to represent an all-zero
+  // mask).
+  if (MB == 0 && ME == 31)
+    return nullptr;
+
   if (NewMI) {
     // Create a new instruction.
     unsigned Reg0 = ChangeReg0 ? Reg2 : MI->getOperand(0).getReg();
@@ -1253,11 +1258,10 @@ PPCInstrInfo::storeRegToStackSlot(MachineBasicBlock &MBB,
     MBB.insert(MI, NewMIs[i]);
 
   const MachineFrameInfo &MFI = *MF.getFrameInfo();
-  MachineMemOperand *MMO =
-    MF.getMachineMemOperand(MachinePointerInfo::getFixedStack(FrameIdx),
-                            MachineMemOperand::MOStore,
-                            MFI.getObjectSize(FrameIdx),
-                            MFI.getObjectAlignment(FrameIdx));
+  MachineMemOperand *MMO = MF.getMachineMemOperand(
+      MachinePointerInfo::getFixedStack(MF, FrameIdx),
+      MachineMemOperand::MOStore, MFI.getObjectSize(FrameIdx),
+      MFI.getObjectAlignment(FrameIdx));
   NewMIs.back()->addMemOperand(MF, MMO);
 }
 
@@ -1366,11 +1370,10 @@ PPCInstrInfo::loadRegFromStackSlot(MachineBasicBlock &MBB,
     MBB.insert(MI, NewMIs[i]);
 
   const MachineFrameInfo &MFI = *MF.getFrameInfo();
-  MachineMemOperand *MMO =
-    MF.getMachineMemOperand(MachinePointerInfo::getFixedStack(FrameIdx),
-                            MachineMemOperand::MOLoad,
-                            MFI.getObjectSize(FrameIdx),
-                            MFI.getObjectAlignment(FrameIdx));
+  MachineMemOperand *MMO = MF.getMachineMemOperand(
+      MachinePointerInfo::getFixedStack(MF, FrameIdx),
+      MachineMemOperand::MOLoad, MFI.getObjectSize(FrameIdx),
+      MFI.getObjectAlignment(FrameIdx));
   NewMIs.back()->addMemOperand(MF, MMO);
 }
 
@@ -1992,5 +1995,37 @@ unsigned PPCInstrInfo::GetInstSizeInBytes(const MachineInstr *MI) const {
     const MCInstrDesc &Desc = get(Opcode);
     return Desc.getSize();
   }
+}
+
+std::pair<unsigned, unsigned>
+PPCInstrInfo::decomposeMachineOperandsTargetFlags(unsigned TF) const {
+  const unsigned Mask = PPCII::MO_ACCESS_MASK;
+  return std::make_pair(TF & Mask, TF & ~Mask);
+}
+
+ArrayRef<std::pair<unsigned, const char *>>
+PPCInstrInfo::getSerializableDirectMachineOperandTargetFlags() const {
+  using namespace PPCII;
+  static const std::pair<unsigned, const char *> TargetFlags[] = {
+      {MO_LO, "ppc-lo"},
+      {MO_HA, "ppc-ha"},
+      {MO_TPREL_LO, "ppc-tprel-lo"},
+      {MO_TPREL_HA, "ppc-tprel-ha"},
+      {MO_DTPREL_LO, "ppc-dtprel-lo"},
+      {MO_TLSLD_LO, "ppc-tlsld-lo"},
+      {MO_TOC_LO, "ppc-toc-lo"},
+      {MO_TLS, "ppc-tls"}};
+  return makeArrayRef(TargetFlags);
+}
+
+ArrayRef<std::pair<unsigned, const char *>>
+PPCInstrInfo::getSerializableBitmaskMachineOperandTargetFlags() const {
+  using namespace PPCII;
+  static const std::pair<unsigned, const char *> TargetFlags[] = {
+      {MO_PLT_OR_STUB, "ppc-plt-or-stub"},
+      {MO_PIC_FLAG, "ppc-pic"},
+      {MO_NLP_FLAG, "ppc-nlp"},
+      {MO_NLP_HIDDEN_FLAG, "ppc-nlp-hidden"}};
+  return makeArrayRef(TargetFlags);
 }
 

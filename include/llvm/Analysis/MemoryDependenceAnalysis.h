@@ -28,7 +28,6 @@ namespace llvm {
   class FunctionPass;
   class Instruction;
   class CallSite;
-  class AliasAnalysis;
   class AssumptionCache;
   class MemoryDependenceAnalysis;
   class PredIteratorCache;
@@ -326,6 +325,7 @@ namespace llvm {
     AliasAnalysis *AA;
     DominatorTree *DT;
     AssumptionCache *AC;
+    const TargetLibraryInfo *TLI;
     PredIteratorCache PredCache;
 
   public:

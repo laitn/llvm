@@ -214,7 +214,7 @@ bool CodeGenPrepare::runOnFunction(Function &F) {
     TLI = TM->getSubtargetImpl(F)->getTargetLowering();
   TLInfo = &getAnalysis<TargetLibraryInfoWrapperPass>().getTLI();
   TTI = &getAnalysis<TargetTransformInfoWrapperPass>().getTTI(F);
-  OptSize = F.hasFnAttribute(Attribute::OptimizeForSize);
+  OptSize = F.optForSize();
 
   /// This optimization identifies DIV instructions that can be
   /// profitably bypassed and carried out with a shorter, faster divide.
@@ -1088,7 +1088,7 @@ static bool OptimizeExtractBits(BinaryOperator *ShiftI, ConstantInt *CI,
 //  ScalarizeMaskedLoad() translates masked load intrinsic, like 
 // <16 x i32 > @llvm.masked.load( <16 x i32>* %addr, i32 align,
 //                               <16 x i1> %mask, <16 x i32> %passthru)
-// to a chain of basic blocks, whith loading element one-by-one if
+// to a chain of basic blocks, with loading element one-by-one if
 // the appropriate mask bit is set
 // 
 //  %1 = bitcast i8* %addr to i32*
@@ -4134,7 +4134,7 @@ class VectorPromoteHelper {
   /// \brief Generate a constant vector with \p Val with the same
   /// number of elements as the transition.
   /// \p UseSplat defines whether or not \p Val should be replicated
-  /// accross the whole vector.
+  /// across the whole vector.
   /// In other words, if UseSplat == true, we generate <Val, Val, ..., Val>,
   /// otherwise we generate a vector with as many undef as possible:
   /// <undef, ..., undef, Val, undef, ..., undef> where \p Val is only
@@ -4667,6 +4667,10 @@ bool CodeGenPrepare::splitBranchCondition(Function &F) {
     if (!match(BB.getTerminator(), m_Br(m_OneUse(m_BinOp(LogicOp)), TBB, FBB)))
       continue;
 
+    auto *Br1 = cast<BranchInst>(BB.getTerminator());
+    if (Br1->getMetadata(LLVMContext::MD_unpredictable))
+      continue;
+
     unsigned Opc;
     Value *Cond1, *Cond2;
     if (match(LogicOp, m_And(m_OneUse(m_Value(Cond1)),
@@ -4693,7 +4697,6 @@ bool CodeGenPrepare::splitBranchCondition(Function &F) {
 
     // Update original basic block by using the first condition directly by the
     // branch instruction and removing the no longer needed and/or instruction.
-    auto *Br1 = cast<BranchInst>(BB.getTerminator());
     Br1->setCondition(Cond1);
     LogicOp->eraseFromParent();
 

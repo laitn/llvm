@@ -38,16 +38,16 @@
 ; CHECK-NOT: {{DW_TAG|NULL}}
 ; CHECK: DW_TAG_member
 ; CHECK-NOT: {{DW_TAG|NULL}}
-; CHECK: DW_TAG_subprogram
+; CHECK: [[M_FN2_DECL:.*]]: DW_TAG_subprogram
 ; CHECK-NOT: DW_TAG
 ; CHECK:     DW_AT_name {{.*}} "m_fn2"
 ; CHECK-NOT: {{DW_TAG|NULL}}
-; CHECK: [[M_FN2_THIS_DECL:.*]]:     DW_TAG_formal_parameter
+; CHECK:     DW_TAG_formal_parameter
 
 ; The abstract definition of C::m_fn2
 ; CHECK: [[M_FN2_ABS_DEF:.*]]: DW_TAG_subprogram
 ; CHECK-NOT: DW_TAG
-; CHECK:   DW_AT_specification {{.*}} "_ZN1C5m_fn2Ev"
+; CHECK:   DW_AT_specification {{.*}} {[[M_FN2_DECL]]}
 ; CHECK-NOT: DW_TAG
 ; CHECK:   DW_AT_inline
 ; CHECK-NOT: {{DW_TAG|NULL}}
@@ -63,7 +63,7 @@
 ; The concrete definition of C::m_fn2
 ; CHECK: DW_TAG_subprogram
 ; CHECK-NOT: DW_TAG
-; CHECK:   DW_AT_abstract_origin {{.*}} {[[M_FN2_ABS_DEF]]} "_ZN1C5m_fn2Ev"
+; CHECK:   DW_AT_abstract_origin {{.*}} {[[M_FN2_ABS_DEF]]}
 ; CHECK-NOT: {{DW_TAG|NULL}}
 ; CHECK:   DW_TAG_formal_parameter
 ; CHECK-NOT: DW_TAG
@@ -78,7 +78,7 @@
 ; Inlined C::m_fn2:
 ; CHECK:         DW_TAG_inlined_subroutine
 ; CHECK-NOT: DW_TAG
-; CHECK:           DW_AT_abstract_origin {{.*}} {[[M_FN2_ABS_DEF]]} "_ZN1C5m_fn2Ev"
+; CHECK:           DW_AT_abstract_origin {{.*}} {[[M_FN2_ABS_DEF]]}
 ; CHECK-NOT: {{DW_TAG|NULL}}
 ; CHECK:           DW_TAG_formal_parameter
 ; CHECK-NOT: DW_TAG
@@ -199,7 +199,7 @@ attributes #3 = { nounwind }
 !llvm.module.flags = !{!28, !29}
 !llvm.ident = !{!30}
 
-!0 = !DICompileUnit(language: DW_LANG_C_plus_plus, producer: "clang version 3.6.0 ", isOptimized: true, emissionKind: 1, file: !1, enums: !2, retainedTypes: !3, subprograms: !13, globals: !26, imports: !2)
+!0 = distinct !DICompileUnit(language: DW_LANG_C_plus_plus, producer: "clang version 3.6.0 ", isOptimized: true, emissionKind: 1, file: !1, enums: !2, retainedTypes: !3, subprograms: !13, globals: !26, imports: !2)
 !1 = !DIFile(filename: "<stdin>", directory: "/usr/local/google/home/blaikie/dev/scratch/missing_concrete_variable_on_darwin/reduce")
 !2 = !{}
 !3 = !{!4}
@@ -213,15 +213,15 @@ attributes #3 = { nounwind }
 !11 = !{null, !12}
 !12 = !DIDerivedType(tag: DW_TAG_pointer_type, size: 64, align: 64, flags: DIFlagArtificial | DIFlagObjectPointer, baseType: !"_ZTS1C")
 !13 = !{!14, !18, !19, !20, !21, !22}
-!14 = !DISubprogram(name: "fn6", linkageName: "_Z3fn6v", line: 15, isLocal: false, isDefinition: true, virtualIndex: 6, flags: DIFlagPrototyped, isOptimized: true, scopeLine: 15, file: !5, scope: !15, type: !16, function: void ()* @_Z3fn6v, variables: !2)
+!14 = distinct !DISubprogram(name: "fn6", linkageName: "_Z3fn6v", line: 15, isLocal: false, isDefinition: true, virtualIndex: 6, flags: DIFlagPrototyped, isOptimized: true, scopeLine: 15, file: !5, scope: !15, type: !16, function: void ()* @_Z3fn6v, variables: !2)
 !15 = !DIFile(filename: "recursive_inlining.cpp", directory: "/usr/local/google/home/blaikie/dev/scratch/missing_concrete_variable_on_darwin/reduce")
 !16 = !DISubroutineType(types: !17)
 !17 = !{null}
-!18 = !DISubprogram(name: "fn3", linkageName: "_Z3fn3v", line: 20, isLocal: false, isDefinition: true, virtualIndex: 6, flags: DIFlagPrototyped, isOptimized: true, scopeLine: 20, file: !5, scope: !15, type: !16, function: void ()* @_Z3fn3v, variables: !2)
-!19 = !DISubprogram(name: "fn4", linkageName: "_Z3fn4v", line: 21, isLocal: false, isDefinition: true, virtualIndex: 6, flags: DIFlagPrototyped, isOptimized: true, scopeLine: 21, file: !5, scope: !15, type: !16, function: void ()* @_Z3fn4v, variables: !2)
-!20 = !DISubprogram(name: "fn5", linkageName: "_Z3fn5v", line: 22, isLocal: false, isDefinition: true, virtualIndex: 6, flags: DIFlagPrototyped, isOptimized: true, scopeLine: 22, file: !5, scope: !15, type: !16, function: void ()* @_Z3fn5v, variables: !2)
-!21 = !DISubprogram(name: "fn7", linkageName: "_Z3fn7v", line: 14, isLocal: false, isDefinition: true, virtualIndex: 6, flags: DIFlagPrototyped, isOptimized: true, scopeLine: 14, file: !5, scope: !15, type: !16, variables: !2)
-!22 = !DISubprogram(name: "m_fn2", linkageName: "_ZN1C5m_fn2Ev", line: 7, isLocal: false, isDefinition: true, virtualIndex: 6, flags: DIFlagPrototyped, isOptimized: true, scopeLine: 7, file: !5, scope: !"_ZTS1C", type: !10, function: void (%struct.C*)* @_ZN1C5m_fn2Ev, declaration: !9, variables: !23)
+!18 = distinct !DISubprogram(name: "fn3", linkageName: "_Z3fn3v", line: 20, isLocal: false, isDefinition: true, virtualIndex: 6, flags: DIFlagPrototyped, isOptimized: true, scopeLine: 20, file: !5, scope: !15, type: !16, function: void ()* @_Z3fn3v, variables: !2)
+!19 = distinct !DISubprogram(name: "fn4", linkageName: "_Z3fn4v", line: 21, isLocal: false, isDefinition: true, virtualIndex: 6, flags: DIFlagPrototyped, isOptimized: true, scopeLine: 21, file: !5, scope: !15, type: !16, function: void ()* @_Z3fn4v, variables: !2)
+!20 = distinct !DISubprogram(name: "fn5", linkageName: "_Z3fn5v", line: 22, isLocal: false, isDefinition: true, virtualIndex: 6, flags: DIFlagPrototyped, isOptimized: true, scopeLine: 22, file: !5, scope: !15, type: !16, function: void ()* @_Z3fn5v, variables: !2)
+!21 = distinct !DISubprogram(name: "fn7", linkageName: "_Z3fn7v", line: 14, isLocal: false, isDefinition: true, virtualIndex: 6, flags: DIFlagPrototyped, isOptimized: true, scopeLine: 14, file: !5, scope: !15, type: !16, variables: !2)
+!22 = distinct !DISubprogram(name: "m_fn2", linkageName: "_ZN1C5m_fn2Ev", line: 7, isLocal: false, isDefinition: true, virtualIndex: 6, flags: DIFlagPrototyped, isOptimized: true, scopeLine: 7, file: !5, scope: !"_ZTS1C", type: !10, function: void (%struct.C*)* @_ZN1C5m_fn2Ev, declaration: !9, variables: !23)
 !23 = !{!24}
 !24 = !DILocalVariable(name: "this", arg: 1, flags: DIFlagArtificial | DIFlagObjectPointer, scope: !22, type: !25)
 !25 = !DIDerivedType(tag: DW_TAG_pointer_type, size: 64, align: 64, baseType: !"_ZTS1C")

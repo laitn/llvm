@@ -44,11 +44,11 @@ attributes #1 = { nounwind readnone }
 !llvm.module.flags = !{!11, !12}
 !llvm.ident = !{!13}
 
-!0 = !DICompileUnit(language: DW_LANG_C_plus_plus, file: !1, producer: "clang version 3.7.0 (trunk 238517) (llvm/trunk 238524)", isOptimized: true, runtimeVersion: 0, emissionKind: 1, enums: !2, retainedTypes: !2, subprograms: !3, globals: !2, imports: !2)
+!0 = distinct !DICompileUnit(language: DW_LANG_C_plus_plus, file: !1, producer: "clang version 3.7.0 (trunk 238517) (llvm/trunk 238524)", isOptimized: true, runtimeVersion: 0, emissionKind: 1, enums: !2, retainedTypes: !2, subprograms: !3, globals: !2, imports: !2)
 !1 = !DIFile(filename: "<stdin>", directory: "/Users/dexonsmith/data/llvm/bootstrap/play/delta2/testcase")
 !2 = !{}
 !3 = !{!4}
-!4 = !DISubprogram(name: "fn1", linkageName: "_Z3fn1v", scope: !5, file: !5, line: 1, type: !6, isLocal: false, isDefinition: true, scopeLine: 1, flags: DIFlagPrototyped, isOptimized: true, function: void ()* @_Z3fn1v, variables: !8)
+!4 = distinct !DISubprogram(name: "fn1", linkageName: "_Z3fn1v", scope: !5, file: !5, line: 1, type: !6, isLocal: false, isDefinition: true, scopeLine: 1, flags: DIFlagPrototyped, isOptimized: true, function: void ()* @_Z3fn1v, variables: !8)
 !5 = !DIFile(filename: "t.cpp", directory: "/Users/dexonsmith/data/llvm/bootstrap/play/delta2/testcase")
 !6 = !DISubroutineType(types: !7)
 !7 = !{null}

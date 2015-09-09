@@ -20,13 +20,13 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/ilist.h"
 #include "llvm/ADT/ilist_node.h"
+#include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/ValueHandle.h"
 #include <vector>
 
 namespace llvm {
 
-class AliasAnalysis;
 class LoadInst;
 class StoreInst;
 class VAArgInst;
@@ -286,7 +286,7 @@ inline raw_ostream& operator<<(raw_ostream &OS, const AliasSet &AS) {
 class AliasSetTracker {
   /// CallbackVH - A CallbackVH to arrange for AliasSetTracker to be
   /// notified whenever a Value is deleted.
-  class ASTCallbackVH : public CallbackVH {
+  class ASTCallbackVH final : public CallbackVH {
     AliasSetTracker *AST;
     void deleted() override;
     void allUsesReplacedWith(Value *) override;

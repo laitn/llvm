@@ -109,7 +109,7 @@ attributes #3 = { nounwind }
 !llvm.module.flags = !{!21, !22}
 !llvm.ident = !{!23}
 
-!0 = !DICompileUnit(language: DW_LANG_C_plus_plus, producer: "clang version 3.7.0 ", isOptimized: false, emissionKind: 1, file: !1, enums: !2, retainedTypes: !3, subprograms: !16, globals: !2, imports: !2)
+!0 = distinct !DICompileUnit(language: DW_LANG_C_plus_plus, producer: "clang version 3.7.0 ", isOptimized: false, emissionKind: 1, file: !1, enums: !2, retainedTypes: !3, subprograms: !16, globals: !2, imports: !2)
 !1 = !DIFile(filename: "<stdin>", directory: "")
 !2 = !{}
 !3 = !{!4, !10}
@@ -126,7 +126,7 @@ attributes #3 = { nounwind }
 !14 = !DIDerivedType(tag: DW_TAG_member, name: "x", line: 10, size: 128, align: 64, offset: 64, file: !5, scope: !"_ZTS1r", baseType: !"_ZTS1p")
 !15 = !DIDerivedType(tag: DW_TAG_member, name: "y", line: 11, size: 128, align: 64, offset: 192, file: !5, scope: !"_ZTS1r", baseType: !"_ZTS1p")
 !16 = !{!17}
-!17 = !DISubprogram(name: "test", linkageName: "_Z4testv", line: 18, isLocal: false, isDefinition: true, flags: DIFlagPrototyped, isOptimized: false, scopeLine: 18, file: !5, scope: !18, type: !19, function: i32 ()* @_Z4testv, variables: !2)
+!17 = distinct !DISubprogram(name: "test", linkageName: "_Z4testv", line: 18, isLocal: false, isDefinition: true, flags: DIFlagPrototyped, isOptimized: false, scopeLine: 18, file: !5, scope: !18, type: !19, function: i32 ()* @_Z4testv, variables: !2)
 !18 = !DIFile(filename: "pr22393.cc", directory: "")
 !19 = !DISubroutineType(types: !20)
 !20 = !{!13}

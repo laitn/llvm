@@ -108,6 +108,16 @@ private:
                          SDValue &TFE) const;
   bool SelectMUBUFOffset(SDValue Addr, SDValue &SRsrc, SDValue &Soffset,
                          SDValue &Offset, SDValue &GLC) const;
+  bool SelectSMRDOffset(SDValue ByteOffsetNode, SDValue &Offset,
+                        bool &Imm) const;
+  bool SelectSMRD(SDValue Addr, SDValue &SBase, SDValue &Offset,
+                  bool &Imm) const;
+  bool SelectSMRDImm(SDValue Addr, SDValue &SBase, SDValue &Offset) const;
+  bool SelectSMRDImm32(SDValue Addr, SDValue &SBase, SDValue &Offset) const;
+  bool SelectSMRDSgpr(SDValue Addr, SDValue &SBase, SDValue &Offset) const;
+  bool SelectSMRDBufferImm(SDValue Addr, SDValue &Offset) const;
+  bool SelectSMRDBufferImm32(SDValue Addr, SDValue &Offset) const;
+  bool SelectSMRDBufferSgpr(SDValue Addr, SDValue &Offset) const;
   SDNode *SelectAddrSpaceCast(SDNode *N);
   bool SelectVOP3Mods(SDValue In, SDValue &Src, SDValue &SrcMods) const;
   bool SelectVOP3NoMods(SDValue In, SDValue &Src, SDValue &SrcMods) const;
@@ -681,7 +691,7 @@ bool AMDGPUDAGToDAGISel::isCPLoad(const LoadSDNode *N) const {
   if (checkPrivateAddress(N->getMemOperand())) {
     if (MMO) {
       const PseudoSourceValue *PSV = MMO->getPseudoValue();
-      if (PSV && PSV == PseudoSourceValue::getConstantPool()) {
+      if (PSV && PSV->isConstantPool()) {
         return true;
       }
     }
@@ -883,15 +893,39 @@ bool AMDGPUDAGToDAGISel::SelectDS1Addr1Offset(SDValue Addr, SDValue &Base,
       Offset = N1;
       return true;
     }
-  }
+  } else if (Addr.getOpcode() == ISD::SUB) {
+    // sub C, x -> add (sub 0, x), C
+    if (const ConstantSDNode *C = dyn_cast<ConstantSDNode>(Addr.getOperand(0))) {
+      int64_t ByteOffset = C->getSExtValue();
+      if (isUInt<16>(ByteOffset)) {
+        SDLoc DL(Addr);
+        SDValue Zero = CurDAG->getTargetConstant(0, DL, MVT::i32);
 
-  SDLoc DL(Addr);
+        // XXX - This is kind of hacky. Create a dummy sub node so we can check
+        // the known bits in isDSOffsetLegal. We need to emit the selected node
+        // here, so this is thrown away.
+        SDValue Sub = CurDAG->getNode(ISD::SUB, DL, MVT::i32,
+                                      Zero, Addr.getOperand(1));
 
-  // If we have a constant address, prefer to put the constant into the
-  // offset. This can save moves to load the constant address since multiple
-  // operations can share the zero base address register, and enables merging
-  // into read2 / write2 instructions.
-  if (const ConstantSDNode *CAddr = dyn_cast<ConstantSDNode>(Addr)) {
+        if (isDSOffsetLegal(Sub, ByteOffset, 16)) {
+          MachineSDNode *MachineSub
+            = CurDAG->getMachineNode(AMDGPU::V_SUB_I32_e32, DL, MVT::i32,
+                                     Zero, Addr.getOperand(1));
+
+          Base = SDValue(MachineSub, 0);
+          Offset = Addr.getOperand(0);
+          return true;
+        }
+      }
+    }
+  } else if (const ConstantSDNode *CAddr = dyn_cast<ConstantSDNode>(Addr)) {
+    // If we have a constant address, prefer to put the constant into the
+    // offset. This can save moves to load the constant address since multiple
+    // operations can share the zero base address register, and enables merging
+    // into read2 / write2 instructions.
+
+    SDLoc DL(Addr);
+
     if (isUInt<16>(CAddr->getZExtValue())) {
       SDValue Zero = CurDAG->getTargetConstant(0, DL, MVT::i32);
       MachineSDNode *MovZero = CurDAG->getMachineNode(AMDGPU::V_MOV_B32_e32,
@@ -904,10 +938,11 @@ bool AMDGPUDAGToDAGISel::SelectDS1Addr1Offset(SDValue Addr, SDValue &Base,
 
   // default case
   Base = Addr;
-  Offset = CurDAG->getTargetConstant(0, DL, MVT::i16);
+  Offset = CurDAG->getTargetConstant(0, SDLoc(Addr), MVT::i16);
   return true;
 }
 
+// TODO: If offset is too big, put low 16-bit into offset.
 bool AMDGPUDAGToDAGISel::SelectDS64Bit4ByteAligned(SDValue Addr, SDValue &Base,
                                                    SDValue &Offset0,
                                                    SDValue &Offset1) const {
@@ -926,9 +961,35 @@ bool AMDGPUDAGToDAGISel::SelectDS64Bit4ByteAligned(SDValue Addr, SDValue &Base,
       Offset1 = CurDAG->getTargetConstant(DWordOffset1, DL, MVT::i8);
       return true;
     }
-  }
+  } else if (Addr.getOpcode() == ISD::SUB) {
+    // sub C, x -> add (sub 0, x), C
+    if (const ConstantSDNode *C = dyn_cast<ConstantSDNode>(Addr.getOperand(0))) {
+      unsigned DWordOffset0 = C->getZExtValue() / 4;
+      unsigned DWordOffset1 = DWordOffset0 + 1;
 
-  if (const ConstantSDNode *CAddr = dyn_cast<ConstantSDNode>(Addr)) {
+      if (isUInt<8>(DWordOffset0)) {
+        SDLoc DL(Addr);
+        SDValue Zero = CurDAG->getTargetConstant(0, DL, MVT::i32);
+
+        // XXX - This is kind of hacky. Create a dummy sub node so we can check
+        // the known bits in isDSOffsetLegal. We need to emit the selected node
+        // here, so this is thrown away.
+        SDValue Sub = CurDAG->getNode(ISD::SUB, DL, MVT::i32,
+                                      Zero, Addr.getOperand(1));
+
+        if (isDSOffsetLegal(Sub, DWordOffset1, 8)) {
+          MachineSDNode *MachineSub
+            = CurDAG->getMachineNode(AMDGPU::V_SUB_I32_e32, DL, MVT::i32,
+                                     Zero, Addr.getOperand(1));
+
+          Base = SDValue(MachineSub, 0);
+          Offset0 = CurDAG->getTargetConstant(DWordOffset0, DL, MVT::i8);
+          Offset1 = CurDAG->getTargetConstant(DWordOffset1, DL, MVT::i8);
+          return true;
+        }
+      }
+    }
+  } else if (const ConstantSDNode *CAddr = dyn_cast<ConstantSDNode>(Addr)) {
     unsigned DWordOffset0 = CAddr->getZExtValue() / 4;
     unsigned DWordOffset1 = DWordOffset0 + 1;
     assert(4 * DWordOffset0 == CAddr->getZExtValue());
@@ -1151,6 +1212,121 @@ bool AMDGPUDAGToDAGISel::SelectMUBUFOffset(SDValue Addr, SDValue &SRsrc,
   SDValue SLC, TFE;
 
   return SelectMUBUFOffset(Addr, SRsrc, Soffset, Offset, GLC, SLC, TFE);
+}
+
+///
+/// \param EncodedOffset This is the immediate value that will be encoded
+///        directly into the instruction.  On SI/CI the \p EncodedOffset
+///        will be in units of dwords and on VI+ it will be units of bytes.
+static bool isLegalSMRDImmOffset(const AMDGPUSubtarget *ST,
+                                 int64_t EncodedOffset) {
+  return ST->getGeneration() < AMDGPUSubtarget::VOLCANIC_ISLANDS ?
+     isUInt<8>(EncodedOffset) : isUInt<20>(EncodedOffset);
+}
+
+bool AMDGPUDAGToDAGISel::SelectSMRDOffset(SDValue ByteOffsetNode,
+                                          SDValue &Offset, bool &Imm) const {
+
+  // FIXME: Handle non-constant offsets.
+  ConstantSDNode *C = dyn_cast<ConstantSDNode>(ByteOffsetNode);
+  if (!C)
+    return false;
+
+  SDLoc SL(ByteOffsetNode);
+  AMDGPUSubtarget::Generation Gen = Subtarget->getGeneration();
+  int64_t ByteOffset = C->getSExtValue();
+  int64_t EncodedOffset = Gen < AMDGPUSubtarget::VOLCANIC_ISLANDS ?
+      ByteOffset >> 2 : ByteOffset;
+
+  if (isLegalSMRDImmOffset(Subtarget, EncodedOffset)) {
+    Offset = CurDAG->getTargetConstant(EncodedOffset, SL, MVT::i32);
+    Imm = true;
+    return true;
+  }
+
+  if (!isUInt<32>(EncodedOffset) || !isUInt<32>(ByteOffset))
+    return false;
+
+  if (Gen == AMDGPUSubtarget::SEA_ISLANDS && isUInt<32>(EncodedOffset)) {
+    // 32-bit Immediates are supported on Sea Islands.
+    Offset = CurDAG->getTargetConstant(EncodedOffset, SL, MVT::i32);
+  } else {
+    SDValue C32Bit = CurDAG->getTargetConstant(ByteOffset, SL, MVT::i32);
+    Offset = SDValue(CurDAG->getMachineNode(AMDGPU::S_MOV_B32, SL, MVT::i32,
+                                            C32Bit), 0);
+  }
+  Imm = false;
+  return true;
+}
+
+bool AMDGPUDAGToDAGISel::SelectSMRD(SDValue Addr, SDValue &SBase,
+                                     SDValue &Offset, bool &Imm) const {
+
+  SDLoc SL(Addr);
+  if (CurDAG->isBaseWithConstantOffset(Addr)) {
+    SDValue N0 = Addr.getOperand(0);
+    SDValue N1 = Addr.getOperand(1);
+
+    if (SelectSMRDOffset(N1, Offset, Imm)) {
+      SBase = N0;
+      return true;
+    }
+  }
+  SBase = Addr;
+  Offset = CurDAG->getTargetConstant(0, SL, MVT::i32);
+  Imm = true;
+  return true;
+}
+
+bool AMDGPUDAGToDAGISel::SelectSMRDImm(SDValue Addr, SDValue &SBase,
+                                       SDValue &Offset) const {
+  bool Imm;
+  return SelectSMRD(Addr, SBase, Offset, Imm) && Imm;
+}
+
+bool AMDGPUDAGToDAGISel::SelectSMRDImm32(SDValue Addr, SDValue &SBase,
+                                         SDValue &Offset) const {
+
+  if (Subtarget->getGeneration() != AMDGPUSubtarget::SEA_ISLANDS)
+    return false;
+
+  bool Imm;
+  if (!SelectSMRD(Addr, SBase, Offset, Imm))
+    return false;
+
+  return !Imm && isa<ConstantSDNode>(Offset);
+}
+
+bool AMDGPUDAGToDAGISel::SelectSMRDSgpr(SDValue Addr, SDValue &SBase,
+                                        SDValue &Offset) const {
+  bool Imm;
+  return SelectSMRD(Addr, SBase, Offset, Imm) && !Imm &&
+         !isa<ConstantSDNode>(Offset);
+}
+
+bool AMDGPUDAGToDAGISel::SelectSMRDBufferImm(SDValue Addr,
+                                             SDValue &Offset) const {
+  bool Imm;
+  return SelectSMRDOffset(Addr, Offset, Imm) && Imm;
+}
+
+bool AMDGPUDAGToDAGISel::SelectSMRDBufferImm32(SDValue Addr,
+                                               SDValue &Offset) const {
+  if (Subtarget->getGeneration() != AMDGPUSubtarget::SEA_ISLANDS)
+    return false;
+
+  bool Imm;
+  if (!SelectSMRDOffset(Addr, Offset, Imm))
+    return false;
+
+  return !Imm && isa<ConstantSDNode>(Offset);
+}
+
+bool AMDGPUDAGToDAGISel::SelectSMRDBufferSgpr(SDValue Addr,
+                                              SDValue &Offset) const {
+  bool Imm;
+  return SelectSMRDOffset(Addr, Offset, Imm) && !Imm &&
+         !isa<ConstantSDNode>(Offset);
 }
 
 // FIXME: This is incorrect and only enough to be able to compile.

@@ -221,7 +221,7 @@ public:
   }
 
   virtual void getAnalysisUsage(AnalysisUsage &AU) const {
-    AU.addRequired<AliasAnalysis>();
+    AU.addRequired<AAResultsWrapperPass>();
   }
 
   virtual bool doInitialization(Module &M) {
@@ -275,7 +275,7 @@ void SafeStack::findInsts(Function &F,
                           SmallVectorImpl<AllocaInst *> &DynamicAllocas,
                           SmallVectorImpl<ReturnInst *> &Returns,
                           SmallVectorImpl<Instruction *> &StackRestorePoints) {
-  for (Instruction &I : inst_range(&F)) {
+  for (Instruction &I : instructions(&F)) {
     if (auto AI = dyn_cast<AllocaInst>(&I)) {
       ++NumAllocas;
 
@@ -513,7 +513,7 @@ void SafeStack::moveDynamicAllocasToUnsafeStack(
 }
 
 bool SafeStack::runOnFunction(Function &F) {
-  auto AA = &getAnalysis<AliasAnalysis>();
+  auto AA = &getAnalysis<AAResultsWrapperPass>().getAAResults();
 
   DEBUG(dbgs() << "[SafeStack] Function: " << F.getName() << "\n");
 

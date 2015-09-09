@@ -25,9 +25,13 @@
  * switch: switch statement with fallthrough
  */
 
-let hasSideEffects = 1, isReturn = 1, isTerminator = 1, hasCtrlDep = 1,
-    isBarrier = 1 in {
-//FIXME return more than just int32.
-def RETURN : I<(outs), (ins Int32:$val), [(WebAssemblyreturn Int32:$val)]>;
-} // hasSideEffects = 1, isReturn = 1, isTerminator = 1, hasCtrlDep = 1,
-  // isBarrier = 1
+multiclass RETURN<WebAssemblyRegClass vt> {
+  def RETURN_#vt : I<(outs), (ins vt:$val), [(WebAssemblyreturn vt:$val)]>;
+}
+let isReturn = 1, isTerminator = 1, hasCtrlDep = 1, isBarrier = 1 in {
+  defm : RETURN<Int32>;
+  defm : RETURN<Int64>;
+  defm : RETURN<Float32>;
+  defm : RETURN<Float64>;
+  def RETURN_VOID : I<(outs), (ins), [(WebAssemblyreturn)]>;
+} // isReturn = 1, isTerminator = 1, hasCtrlDep = 1, isBarrier = 1

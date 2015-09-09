@@ -98,7 +98,7 @@ namespace {
       AU.addPreserved<LoopInfoWrapperPass>();
       AU.addRequired<DominatorTreeWrapperPass>();
       AU.addPreserved<DominatorTreeWrapperPass>();
-      AU.addRequired<ScalarEvolution>();
+      AU.addRequired<ScalarEvolutionWrapperPass>();
     }
 
   private:
@@ -147,7 +147,7 @@ INITIALIZE_PASS_BEGIN(PPCCTRLoops, "ppc-ctr-loops", "PowerPC CTR Loops",
                       false, false)
 INITIALIZE_PASS_DEPENDENCY(DominatorTreeWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(LoopInfoWrapperPass)
-INITIALIZE_PASS_DEPENDENCY(ScalarEvolution)
+INITIALIZE_PASS_DEPENDENCY(ScalarEvolutionWrapperPass)
 INITIALIZE_PASS_END(PPCCTRLoops, "ppc-ctr-loops", "PowerPC CTR Loops",
                     false, false)
 
@@ -169,7 +169,7 @@ FunctionPass *llvm::createPPCCTRLoopsVerify() {
 
 bool PPCCTRLoops::runOnFunction(Function &F) {
   LI = &getAnalysis<LoopInfoWrapperPass>().getLoopInfo();
-  SE = &getAnalysis<ScalarEvolution>();
+  SE = &getAnalysis<ScalarEvolutionWrapperPass>().getSE();
   DT = &getAnalysis<DominatorTreeWrapperPass>().getDomTree();
   DL = &F.getParent()->getDataLayout();
   auto *TLIP = getAnalysisIfAvailable<TargetLibraryInfoWrapperPass>();
@@ -239,6 +239,11 @@ bool PPCCTRLoops::mightUseCTR(const Triple &TT, BasicBlock *BB) {
         if (F->getIntrinsicID() != Intrinsic::not_intrinsic) {
           switch (F->getIntrinsicID()) {
           default: continue;
+          // If we have a call to ppc_is_decremented_ctr_nonzero, or ppc_mtctr
+          // we're definitely using CTR.
+          case Intrinsic::ppc_is_decremented_ctr_nonzero:
+	  case Intrinsic::ppc_mtctr:
+	    return true;
 
 // VisualStudio defines setjmp as _setjmp
 #if defined(_MSC_VER) && defined(setjmp) && \
@@ -426,6 +431,7 @@ bool PPCCTRLoops::convertToCTRLoop(Loop *L) {
   // Process nested loops first.
   for (Loop::iterator I = L->begin(), E = L->end(); I != E; ++I) {
     MadeChange |= convertToCTRLoop(*I);
+    DEBUG(dbgs() << "Nested loop converted\n");
   }
 
   // If a nested loop has been converted, then we can't convert this loop.

@@ -24,13 +24,19 @@
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Analysis/AliasAnalysis.h"
+#include "llvm/Analysis/AssumptionCache.h"
+#include "llvm/Analysis/BasicAliasAnalysis.h"
 #include "llvm/Analysis/CallGraph.h"
 #include "llvm/Analysis/CallGraphSCCPass.h"
 #include "llvm/Analysis/CaptureTracking.h"
+#include "llvm/Analysis/TargetLibraryInfo.h"
+#include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/LLVMContext.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 using namespace llvm;
 
@@ -42,12 +48,13 @@ STATISTIC(NumNoCapture, "Number of arguments marked nocapture");
 STATISTIC(NumReadNoneArg, "Number of arguments marked readnone");
 STATISTIC(NumReadOnlyArg, "Number of arguments marked readonly");
 STATISTIC(NumNoAlias, "Number of function returns marked noalias");
+STATISTIC(NumNonNullReturn, "Number of function returns marked nonnull");
 STATISTIC(NumAnnotated, "Number of attributes added to library functions");
 
 namespace {
   struct FunctionAttrs : public CallGraphSCCPass {
     static char ID; // Pass identification, replacement for typeid
-    FunctionAttrs() : CallGraphSCCPass(ID), AA(nullptr) {
+    FunctionAttrs() : CallGraphSCCPass(ID) {
       initializeFunctionAttrsPass(*PassRegistry::getPassRegistry());
     }
 
@@ -66,6 +73,13 @@ namespace {
 
     // AddNoAliasAttrs - Deduce noalias attributes for the SCC.
     bool AddNoAliasAttrs(const CallGraphSCC &SCC);
+
+    /// \brief Does this function return null?  
+    bool ReturnsNonNull(Function *F, SmallPtrSet<Function*, 8> &,
+                        bool &Speculative) const;
+
+    /// \brief Deduce nonnull attributes for the SCC.
+    bool AddNonNullAttrs(const CallGraphSCC &SCC);
 
     // Utility methods used by inferPrototypeAttributes to add attributes
     // and maintain annotation statistics.
@@ -123,13 +137,12 @@ namespace {
 
     void getAnalysisUsage(AnalysisUsage &AU) const override {
       AU.setPreservesCFG();
-      AU.addRequired<AliasAnalysis>();
+      AU.addRequired<AssumptionCacheTracker>();
       AU.addRequired<TargetLibraryInfoWrapperPass>();
       CallGraphSCCPass::getAnalysisUsage(AU);
     }
 
   private:
-    AliasAnalysis *AA;
     TargetLibraryInfo *TLI;
   };
 }
@@ -137,7 +150,7 @@ namespace {
 char FunctionAttrs::ID = 0;
 INITIALIZE_PASS_BEGIN(FunctionAttrs, "functionattrs",
                 "Deduce function attributes", false, false)
-INITIALIZE_AG_DEPENDENCY(AliasAnalysis)
+INITIALIZE_PASS_DEPENDENCY(AssumptionCacheTracker)
 INITIALIZE_PASS_DEPENDENCY(CallGraphWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(TargetLibraryInfoWrapperPass)
 INITIALIZE_PASS_END(FunctionAttrs, "functionattrs",
@@ -166,7 +179,15 @@ bool FunctionAttrs::AddReadAttrs(const CallGraphSCC &SCC) {
       // memory and give up.
       return false;
 
-    FunctionModRefBehavior MRB = AA->getModRefBehavior(F);
+    // We need to manually construct BasicAA directly in order to disable its
+    // use of other function analyses.
+    BasicAAResult BAR(createLegacyPMBasicAAResult(*this, *F));
+
+    // Construct our own AA results for this function. We do this manually to
+    // work around the limitations of the legacy pass manager.
+    AAResults AAR(createLegacyPMAAResults(*this, *F, BAR));
+
+    FunctionModRefBehavior MRB = AAR.getModRefBehavior(F);
     if (MRB == FMRB_DoesNotAccessMemory)
       // Already perfect!
       continue;
@@ -193,7 +214,7 @@ bool FunctionAttrs::AddReadAttrs(const CallGraphSCC &SCC) {
         // Ignore calls to functions in the same SCC.
         if (CS.getCalledFunction() && SCCNodes.count(CS.getCalledFunction()))
           continue;
-        FunctionModRefBehavior MRB = AA->getModRefBehavior(CS);
+        FunctionModRefBehavior MRB = AAR.getModRefBehavior(CS);
         // If the call doesn't access arbitrary memory, we may be able to
         // figure out something.
         if (AliasAnalysis::onlyAccessesArgPointees(MRB)) {
@@ -209,7 +230,7 @@ bool FunctionAttrs::AddReadAttrs(const CallGraphSCC &SCC) {
                 I->getAAMetadata(AAInfo);
 
                 MemoryLocation Loc(Arg, MemoryLocation::UnknownSize, AAInfo);
-                if (!AA->pointsToConstantMemory(Loc, /*OrLocal=*/true)) {
+                if (!AAR.pointsToConstantMemory(Loc, /*OrLocal=*/true)) {
                   if (MRB & MRI_Mod)
                     // Writes non-local memory.  Give up.
                     return false;
@@ -232,20 +253,20 @@ bool FunctionAttrs::AddReadAttrs(const CallGraphSCC &SCC) {
         // Ignore non-volatile loads from local memory. (Atomic is okay here.)
         if (!LI->isVolatile()) {
           MemoryLocation Loc = MemoryLocation::get(LI);
-          if (AA->pointsToConstantMemory(Loc, /*OrLocal=*/true))
+          if (AAR.pointsToConstantMemory(Loc, /*OrLocal=*/true))
             continue;
         }
       } else if (StoreInst *SI = dyn_cast<StoreInst>(I)) {
         // Ignore non-volatile stores to local memory. (Atomic is okay here.)
         if (!SI->isVolatile()) {
           MemoryLocation Loc = MemoryLocation::get(SI);
-          if (AA->pointsToConstantMemory(Loc, /*OrLocal=*/true))
+          if (AAR.pointsToConstantMemory(Loc, /*OrLocal=*/true))
             continue;
         }
       } else if (VAArgInst *VI = dyn_cast<VAArgInst>(I)) {
         // Ignore vaargs on local memory.
         MemoryLocation Loc = MemoryLocation::get(VI);
-        if (AA->pointsToConstantMemory(Loc, /*OrLocal=*/true))
+        if (AAR.pointsToConstantMemory(Loc, /*OrLocal=*/true))
           continue;
       }
 
@@ -827,6 +848,143 @@ bool FunctionAttrs::AddNoAliasAttrs(const CallGraphSCC &SCC) {
     F->setDoesNotAlias(0);
     ++NumNoAlias;
     MadeChange = true;
+  }
+
+  return MadeChange;
+}
+
+bool FunctionAttrs::ReturnsNonNull(Function *F,
+                                   SmallPtrSet<Function*, 8> &SCCNodes,
+                                   bool &Speculative) const {
+  assert(F->getReturnType()->isPointerTy() &&
+         "nonnull only meaningful on pointer types");
+  Speculative = false;
+  
+  SmallSetVector<Value *, 8> FlowsToReturn;
+  for (BasicBlock &BB : *F)
+    if (auto *Ret = dyn_cast<ReturnInst>(BB.getTerminator()))
+      FlowsToReturn.insert(Ret->getReturnValue());
+
+  for (unsigned i = 0; i != FlowsToReturn.size(); ++i) {
+    Value *RetVal = FlowsToReturn[i];
+
+    // If this value is locally known to be non-null, we're good
+    if (isKnownNonNull(RetVal, TLI))
+      continue;
+
+    // Otherwise, we need to look upwards since we can't make any local
+    // conclusions.  
+    Instruction *RVI = dyn_cast<Instruction>(RetVal);
+    if (!RVI)
+      return false;
+    switch (RVI->getOpcode()) {
+      // Extend the analysis by looking upwards.
+    case Instruction::BitCast:
+    case Instruction::GetElementPtr:
+    case Instruction::AddrSpaceCast:
+      FlowsToReturn.insert(RVI->getOperand(0));
+      continue;
+    case Instruction::Select: {
+      SelectInst *SI = cast<SelectInst>(RVI);
+      FlowsToReturn.insert(SI->getTrueValue());
+      FlowsToReturn.insert(SI->getFalseValue());
+      continue;
+    }
+    case Instruction::PHI: {
+      PHINode *PN = cast<PHINode>(RVI);
+      for (int i = 0, e = PN->getNumIncomingValues(); i != e; ++i)
+        FlowsToReturn.insert(PN->getIncomingValue(i));
+      continue;
+    }
+    case Instruction::Call:
+    case Instruction::Invoke: {
+      CallSite CS(RVI);
+      Function *Callee = CS.getCalledFunction();
+      // A call to a node within the SCC is assumed to return null until
+      // proven otherwise
+      if (Callee && SCCNodes.count(Callee)) {
+        Speculative = true;
+        continue;
+      }
+      return false;
+    }
+    default:
+      return false;  // Unknown source, may be null
+    };
+    llvm_unreachable("should have either continued or returned");
+  }
+
+  return true;
+}
+
+bool FunctionAttrs::AddNonNullAttrs(const CallGraphSCC &SCC) {
+  SmallPtrSet<Function*, 8> SCCNodes;
+
+  // Fill SCCNodes with the elements of the SCC.  Used for quickly
+  // looking up whether a given CallGraphNode is in this SCC.
+  for (CallGraphSCC::iterator I = SCC.begin(), E = SCC.end(); I != E; ++I)
+    SCCNodes.insert((*I)->getFunction());
+
+  // Speculative that all functions in the SCC return only nonnull
+  // pointers.  We may refute this as we analyze functions.
+  bool SCCReturnsNonNull = true;
+
+  bool MadeChange = false;
+
+  // Check each function in turn, determining which functions return nonnull
+  // pointers.
+  for (CallGraphSCC::iterator I = SCC.begin(), E = SCC.end(); I != E; ++I) {
+    Function *F = (*I)->getFunction();
+
+    if (!F || F->hasFnAttribute(Attribute::OptimizeNone))
+      // External node or node we don't want to optimize - skip it;
+      return false;
+
+    // Already nonnull.
+    if (F->getAttributes().hasAttribute(AttributeSet::ReturnIndex,
+                                        Attribute::NonNull))
+      continue;
+
+    // Definitions with weak linkage may be overridden at linktime, so
+    // treat them like declarations.
+    if (F->isDeclaration() || F->mayBeOverridden())
+      return false;
+
+    // We annotate nonnull return values, which are only applicable to 
+    // pointer types.
+    if (!F->getReturnType()->isPointerTy())
+      continue;
+
+    bool Speculative = false;
+    if (ReturnsNonNull(F, SCCNodes, Speculative)) {
+      if (!Speculative) {
+        // Mark the function eagerly since we may discover a function
+        // which prevents us from speculating about the entire SCC
+        DEBUG(dbgs() << "Eagerly marking " << F->getName() << " as nonnull\n");
+        F->addAttribute(AttributeSet::ReturnIndex, Attribute::NonNull);
+        ++NumNonNullReturn;
+        MadeChange = true;
+      }
+      continue;
+    }
+    // At least one function returns something which could be null, can't
+    // speculate any more.
+    SCCReturnsNonNull = false;
+  }
+
+  if (SCCReturnsNonNull) {
+    for (CallGraphSCC::iterator I = SCC.begin(), E = SCC.end(); I != E; ++I) {
+      Function *F = (*I)->getFunction();
+      if (F->getAttributes().hasAttribute(AttributeSet::ReturnIndex,
+                                          Attribute::NonNull) ||
+          !F->getReturnType()->isPointerTy())
+        continue;
+
+      DEBUG(dbgs() << "SCC marking " << F->getName() << " as nonnull\n");
+      F->addAttribute(AttributeSet::ReturnIndex, Attribute::NonNull);
+      ++NumNonNullReturn;
+      MadeChange = true;
+    }
   }
 
   return MadeChange;
@@ -1700,12 +1858,12 @@ bool FunctionAttrs::annotateLibraryCalls(const CallGraphSCC &SCC) {
 }
 
 bool FunctionAttrs::runOnSCC(CallGraphSCC &SCC) {
-  AA = &getAnalysis<AliasAnalysis>();
   TLI = &getAnalysis<TargetLibraryInfoWrapperPass>().getTLI();
 
   bool Changed = annotateLibraryCalls(SCC);
   Changed |= AddReadAttrs(SCC);
   Changed |= AddArgumentAttrs(SCC);
   Changed |= AddNoAliasAttrs(SCC);
+  Changed |= AddNonNullAttrs(SCC);
   return Changed;
 }

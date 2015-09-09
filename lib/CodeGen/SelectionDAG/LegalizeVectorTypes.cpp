@@ -108,6 +108,8 @@ void DAGTypeLegalizer::ScalarizeVectorResult(SDNode *N, unsigned ResNo) {
   case ISD::FMUL:
   case ISD::FMINNUM:
   case ISD::FMAXNUM:
+  case ISD::FMINNAN:
+  case ISD::FMAXNAN:
 
   case ISD::FPOW:
   case ISD::FREM:
@@ -594,6 +596,7 @@ void DAGTypeLegalizer::SplitVectorResult(SDNode *N, unsigned ResNo) {
   case ISD::INSERT_SUBVECTOR:  SplitVecRes_INSERT_SUBVECTOR(N, Lo, Hi); break;
   case ISD::FP_ROUND_INREG:    SplitVecRes_InregOp(N, Lo, Hi); break;
   case ISD::FPOWI:             SplitVecRes_FPOWI(N, Lo, Hi); break;
+  case ISD::FCOPYSIGN:         SplitVecRes_FCOPYSIGN(N, Lo, Hi); break;
   case ISD::INSERT_VECTOR_ELT: SplitVecRes_INSERT_VECTOR_ELT(N, Lo, Hi); break;
   case ISD::SCALAR_TO_VECTOR:  SplitVecRes_SCALAR_TO_VECTOR(N, Lo, Hi); break;
   case ISD::SIGN_EXTEND_INREG: SplitVecRes_InregOp(N, Lo, Hi); break;
@@ -656,11 +659,12 @@ void DAGTypeLegalizer::SplitVectorResult(SDNode *N, unsigned ResNo) {
   case ISD::SUB:
   case ISD::MUL:
   case ISD::FADD:
-  case ISD::FCOPYSIGN:
   case ISD::FSUB:
   case ISD::FMUL:
   case ISD::FMINNUM:
   case ISD::FMAXNUM:
+  case ISD::FMINNAN:
+  case ISD::FMAXNAN:
   case ISD::SDIV:
   case ISD::UDIV:
   case ISD::FDIV:
@@ -870,6 +874,25 @@ void DAGTypeLegalizer::SplitVecRes_FPOWI(SDNode *N, SDValue &Lo,
   GetSplitVector(N->getOperand(0), Lo, Hi);
   Lo = DAG.getNode(ISD::FPOWI, dl, Lo.getValueType(), Lo, N->getOperand(1));
   Hi = DAG.getNode(ISD::FPOWI, dl, Hi.getValueType(), Hi, N->getOperand(1));
+}
+
+void DAGTypeLegalizer::SplitVecRes_FCOPYSIGN(SDNode *N, SDValue &Lo,
+                                             SDValue &Hi) {
+  SDValue LHSLo, LHSHi;
+  GetSplitVector(N->getOperand(0), LHSLo, LHSHi);
+  SDLoc DL(N);
+
+  SDValue RHSLo, RHSHi;
+  SDValue RHS = N->getOperand(1);
+  EVT RHSVT = RHS.getValueType();
+  if (getTypeAction(RHSVT) == TargetLowering::TypeSplitVector)
+    GetSplitVector(RHS, RHSLo, RHSHi);
+  else
+    std::tie(RHSLo, RHSHi) = DAG.SplitVector(RHS, SDLoc(RHS));
+
+
+  Lo = DAG.getNode(ISD::FCOPYSIGN, DL, LHSLo.getValueType(), LHSLo, RHSLo);
+  Hi = DAG.getNode(ISD::FCOPYSIGN, DL, LHSHi.getValueType(), LHSHi, RHSHi);
 }
 
 void DAGTypeLegalizer::SplitVecRes_InregOp(SDNode *N, SDValue &Lo,
@@ -1359,6 +1382,7 @@ bool DAGTypeLegalizer::SplitVectorOperand(SDNode *N, unsigned OpNo) {
       Res = SplitVecOp_TruncateHelper(N);
       break;
     case ISD::FP_ROUND:          Res = SplitVecOp_FP_ROUND(N); break;
+    case ISD::FCOPYSIGN:         Res = SplitVecOp_FCOPYSIGN(N); break;
     case ISD::STORE:
       Res = SplitVecOp_STORE(cast<StoreSDNode>(N), OpNo);
       break;
@@ -1530,9 +1554,25 @@ SDValue DAGTypeLegalizer::SplitVecOp_EXTRACT_VECTOR_ELT(SDNode *N) {
   if (CustomLowerNode(N, N->getValueType(0), true))
     return SDValue();
 
-  // Store the vector to the stack.
-  EVT EltVT = VecVT.getVectorElementType();
+  // Make the vector elements byte-addressable if they aren't already.
   SDLoc dl(N);
+  EVT EltVT = VecVT.getVectorElementType();
+  if (EltVT.getSizeInBits() < 8) {
+    SmallVector<SDValue, 4> ElementOps;
+    for (unsigned i = 0; i < VecVT.getVectorNumElements(); ++i) {
+      ElementOps.push_back(DAG.getAnyExtOrTrunc(
+          DAG.getNode(ISD::EXTRACT_VECTOR_ELT, dl, EltVT, Vec,
+                      DAG.getConstant(i, dl, MVT::i8)),
+          dl, MVT::i8));
+    }
+
+    EltVT = MVT::i8;
+    VecVT = EVT::getVectorVT(*DAG.getContext(), EltVT,
+                             VecVT.getVectorNumElements());
+    Vec = DAG.getNode(ISD::BUILD_VECTOR, dl, VecVT, ElementOps);
+  }
+
+  // Store the vector to the stack.
   SDValue StackPtr = DAG.CreateStackTemporary(VecVT);
   SDValue Store = DAG.getStore(DAG.getEntryNode(), dl, Vec, StackPtr,
                                MachinePointerInfo(), false, false, 0);
@@ -1877,6 +1917,11 @@ SDValue DAGTypeLegalizer::SplitVecOp_FP_ROUND(SDNode *N) {
   return DAG.getNode(ISD::CONCAT_VECTORS, DL, ResVT, Lo, Hi);
 }
 
+SDValue DAGTypeLegalizer::SplitVecOp_FCOPYSIGN(SDNode *N) {
+  // The result (and the first input) has a legal vector type, but the second
+  // input needs splitting.
+  return DAG.UnrollVectorOp(N, N->getValueType(0).getVectorNumElements());
+}
 
 
 //===----------------------------------------------------------------------===//
@@ -1935,11 +1980,12 @@ void DAGTypeLegalizer::WidenVectorResult(SDNode *N, unsigned ResNo) {
   case ISD::XOR:
   case ISD::FMINNUM:
   case ISD::FMAXNUM:
+  case ISD::FMINNAN:
+  case ISD::FMAXNAN:
     Res = WidenVecRes_Binary(N);
     break;
 
   case ISD::FADD:
-  case ISD::FCOPYSIGN:
   case ISD::FMUL:
   case ISD::FPOW:
   case ISD::FSUB:
@@ -1950,6 +1996,10 @@ void DAGTypeLegalizer::WidenVectorResult(SDNode *N, unsigned ResNo) {
   case ISD::SREM:
   case ISD::UREM:
     Res = WidenVecRes_BinaryCanTrap(N);
+    break;
+
+  case ISD::FCOPYSIGN:
+    Res = WidenVecRes_FCOPYSIGN(N);
     break;
 
   case ISD::FPOWI:
@@ -2244,6 +2294,17 @@ SDValue DAGTypeLegalizer::WidenVecRes_Convert(SDNode *N) {
     Ops[i] = UndefVal;
 
   return DAG.getNode(ISD::BUILD_VECTOR, DL, WidenVT, Ops);
+}
+
+SDValue DAGTypeLegalizer::WidenVecRes_FCOPYSIGN(SDNode *N) {
+  // If this is an FCOPYSIGN with same input types, we can treat it as a
+  // normal (can trap) binary op.
+  if (N->getOperand(0).getValueType() == N->getOperand(1).getValueType())
+    return WidenVecRes_BinaryCanTrap(N);
+
+  // If the types are different, fall back to unrolling.
+  EVT WidenVT = TLI.getTypeToTransformTo(*DAG.getContext(), N->getValueType(0));
+  return DAG.UnrollVectorOp(N, WidenVT.getVectorNumElements());
 }
 
 SDValue DAGTypeLegalizer::WidenVecRes_POWI(SDNode *N) {
@@ -2818,6 +2879,7 @@ bool DAGTypeLegalizer::WidenVectorOperand(SDNode *N, unsigned OpNo) {
   case ISD::STORE:              Res = WidenVecOp_STORE(N); break;
   case ISD::MSTORE:             Res = WidenVecOp_MSTORE(N, OpNo); break;
   case ISD::SETCC:              Res = WidenVecOp_SETCC(N); break;
+  case ISD::FCOPYSIGN:          Res = WidenVecOp_FCOPYSIGN(N); break;
 
   case ISD::ANY_EXTEND:
   case ISD::SIGN_EXTEND:
@@ -2912,6 +2974,13 @@ SDValue DAGTypeLegalizer::WidenVecOp_EXTEND(SDNode *N) {
   case ISD::ZERO_EXTEND:
     return DAG.getZeroExtendVectorInReg(InOp, DL, VT);
   }
+}
+
+SDValue DAGTypeLegalizer::WidenVecOp_FCOPYSIGN(SDNode *N) {
+  // The result (and first input) is legal, but the second input is illegal.
+  // We can't do much to fix that, so just unroll and let the extracts off of
+  // the second input be widened as needed later.
+  return DAG.UnrollVectorOp(N);
 }
 
 SDValue DAGTypeLegalizer::WidenVecOp_Convert(SDNode *N) {

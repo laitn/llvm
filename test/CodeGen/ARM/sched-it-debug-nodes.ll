@@ -50,11 +50,11 @@ attributes #3 = { nounwind }
 !llvm.module.flags = !{!23, !24, !25, !26}
 !llvm.ident = !{!27}
 
-!0 = !DICompileUnit(language: DW_LANG_C99, file: !1, producer: "clang version 3.7.0  (llvm/trunk 237059)", isOptimized: true, runtimeVersion: 0, emissionKind: 1, enums: !2, retainedTypes: !2, subprograms: !3, globals: !2, imports: !2)
+!0 = distinct !DICompileUnit(language: DW_LANG_C99, file: !1, producer: "clang version 3.7.0  (llvm/trunk 237059)", isOptimized: true, runtimeVersion: 0, emissionKind: 1, enums: !2, retainedTypes: !2, subprograms: !3, globals: !2, imports: !2)
 !1 = !DIFile(filename: "<stdin>", directory: "/Users/compnerd/Source/llvm")
 !2 = !{}
 !3 = !{!4}
-!4 = !DISubprogram(name: "f", scope: !5, file: !5, line: 9, type: !6, isLocal: false, isDefinition: true, scopeLine: 9, flags: DIFlagPrototyped, isOptimized: true, function: i32 (%struct.s*, i32, i8*, i32)* @f, variables: !18)
+!4 = distinct !DISubprogram(name: "f", scope: !5, file: !5, line: 9, type: !6, isLocal: false, isDefinition: true, scopeLine: 9, flags: DIFlagPrototyped, isOptimized: true, function: i32 (%struct.s*, i32, i8*, i32)* @f, variables: !18)
 !5 = !DIFile(filename: "<stdin>", directory: "/Users/compnerd/Source/llvm")
 !6 = !DISubroutineType(types: !7)
 !7 = !{!8, !9, !12, !13, !17}
