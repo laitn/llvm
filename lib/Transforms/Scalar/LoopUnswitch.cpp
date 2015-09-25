@@ -30,6 +30,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Analysis/GlobalsModRef.h"
 #include "llvm/Analysis/AssumptionCache.h"
 #include "llvm/Analysis/CodeMetrics.h"
 #include "llvm/Analysis/InstructionSimplify.h"
@@ -192,9 +193,11 @@ namespace {
       AU.addPreserved<LoopInfoWrapperPass>();
       AU.addRequiredID(LCSSAID);
       AU.addPreservedID(LCSSAID);
+      AU.addRequired<DominatorTreeWrapperPass>();
       AU.addPreserved<DominatorTreeWrapperPass>();
       AU.addPreserved<ScalarEvolutionWrapperPass>();
       AU.addRequired<TargetTransformInfoWrapperPass>();
+      AU.addPreserved<GlobalsAAWrapperPass>();
     }
 
   private:
@@ -410,9 +413,7 @@ bool LoopUnswitch::runOnLoop(Loop *L, LPPassManager &LPM_Ref) {
       *L->getHeader()->getParent());
   LI = &getAnalysis<LoopInfoWrapperPass>().getLoopInfo();
   LPM = &LPM_Ref;
-  DominatorTreeWrapperPass *DTWP =
-      getAnalysisIfAvailable<DominatorTreeWrapperPass>();
-  DT = DTWP ? &DTWP->getDomTree() : nullptr;
+  DT = &getAnalysis<DominatorTreeWrapperPass>().getDomTree();
   currentLoop = L;
   Function *F = currentLoop->getHeader()->getParent();
   bool Changed = false;
@@ -422,11 +423,9 @@ bool LoopUnswitch::runOnLoop(Loop *L, LPPassManager &LPM_Ref) {
     Changed |= processCurrentLoop();
   } while(redoLoop);
 
-  if (Changed) {
-    // FIXME: Reconstruct dom info, because it is not preserved properly.
-    if (DT)
-      DT->recalculate(*F);
-  }
+  // FIXME: Reconstruct dom info, because it is not preserved properly.
+  if (Changed)
+    DT->recalculate(*F);
   return Changed;
 }
 
@@ -1194,8 +1193,7 @@ void LoopUnswitch::RewriteLoopBodyWithConditionConstant(Loop *L, Value *LIC,
     // domtree here -- instead we force it to do a full recomputation
     // after the pass is complete -- but we do need to inform it of
     // new blocks.
-    if (DT)
-      DT->addNewBlock(Abort, NewSISucc);
+    DT->addNewBlock(Abort, NewSISucc);
   }
 
   SimplifyCode(Worklist, L);

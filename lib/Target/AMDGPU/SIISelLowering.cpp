@@ -569,7 +569,7 @@ SDValue SITargetLowering::LowerFormalArguments(
   }
 
   // The pointer to the list of arguments is stored in SGPR0, SGPR1
-	// The pointer to the scratch buffer is stored in SGPR2, SGPR3
+  // The pointer to the scratch buffer is stored in SGPR2, SGPR3
   if (Info->getShaderType() == ShaderType::COMPUTE) {
     if (Subtarget->isAmdHsaOS())
       Info->NumUserSGPRs = 2;  // FIXME: Need to support scratch buffers.
@@ -691,7 +691,7 @@ SDValue SITargetLowering::LowerFormalArguments(
   }
 
   if (Info->getShaderType() != ShaderType::COMPUTE) {
-    unsigned ScratchIdx = CCInfo.getFirstUnallocated(ArrayRef<MCPhysReg>(
+    unsigned ScratchIdx = CCInfo.getFirstUnallocated(makeArrayRef(
         AMDGPU::SGPR_32RegClass.begin(), AMDGPU::SGPR_32RegClass.getNumRegs()));
     Info->ScratchOffsetReg = AMDGPU::SGPR_32RegClass.getRegister(ScratchIdx);
   }
@@ -1000,6 +1000,8 @@ SDValue SITargetLowering::LowerINTRINSIC_WO_CHAIN(SDValue Op,
   SDLoc DL(Op);
   unsigned IntrinsicID = cast<ConstantSDNode>(Op.getOperand(0))->getZExtValue();
 
+  // TODO: Should this propagate fast-math-flags?
+
   switch (IntrinsicID) {
   case Intrinsic::r600_read_ngroups_x:
     return LowerParameter(DAG, VT, VT, DL, DAG.getEntryNode(),
@@ -1248,8 +1250,10 @@ SDValue SITargetLowering::LowerFastFDIV(SDValue Op, SelectionDAG &DAG) const {
   if (Unsafe) {
     // Turn into multiply by the reciprocal.
     // x / y -> x * (1.0 / y)
+    SDNodeFlags Flags;
+    Flags.setUnsafeAlgebra(true);
     SDValue Recip = DAG.getNode(AMDGPUISD::RCP, SL, VT, RHS);
-    return DAG.getNode(ISD::FMUL, SL, VT, LHS, Recip);
+    return DAG.getNode(ISD::FMUL, SL, VT, LHS, Recip, &Flags);
   }
 
   return SDValue();
@@ -1285,6 +1289,8 @@ SDValue SITargetLowering::LowerFDIV32(SDValue Op, SelectionDAG &DAG) const {
   SDValue r2 = DAG.getSetCC(SL, SetCCVT, r1, K0, ISD::SETOGT);
 
   SDValue r3 = DAG.getNode(ISD::SELECT, SL, MVT::f32, r2, K1, One);
+
+  // TODO: Should this propagate fast-math-flags?
 
   r1 = DAG.getNode(ISD::FMUL, SL, MVT::f32, RHS, r3);
 
@@ -1405,6 +1411,7 @@ SDValue SITargetLowering::LowerTrig(SDValue Op, SelectionDAG &DAG) const {
   SDLoc DL(Op);
   EVT VT = Op.getValueType();
   SDValue Arg = Op.getOperand(0);
+  // TODO: Should this propagate fast-math-flags?
   SDValue FractPart = DAG.getNode(AMDGPUISD::FRACT, DL, VT,
                                   DAG.getNode(ISD::FMUL, DL, VT, Arg,
                                               DAG.getConstantFP(0.5/M_PI, DL,
@@ -2181,47 +2188,32 @@ MachineSDNode *SITargetLowering::wrapAddr64Rsrc(SelectionDAG &DAG,
                                                 SDLoc DL,
                                                 SDValue Ptr) const {
   const SIInstrInfo *TII =
-      static_cast<const SIInstrInfo *>(Subtarget->getInstrInfo());
-#if 1
-    // XXX - Workaround for moveToVALU not handling different register class
-    // inserts for REG_SEQUENCE.
+    static_cast<const SIInstrInfo *>(Subtarget->getInstrInfo());
 
-    // Build the half of the subregister with the constants.
-    const SDValue Ops0[] = {
-      DAG.getTargetConstant(AMDGPU::SGPR_64RegClassID, DL, MVT::i32),
-      buildSMovImm32(DAG, DL, 0),
-      DAG.getTargetConstant(AMDGPU::sub0, DL, MVT::i32),
-      buildSMovImm32(DAG, DL, TII->getDefaultRsrcDataFormat() >> 32),
-      DAG.getTargetConstant(AMDGPU::sub1, DL, MVT::i32)
-    };
+  // Build the half of the subregister with the constants before building the
+  // full 128-bit register. If we are building multiple resource descriptors,
+  // this will allow CSEing of the 2-component register.
+  const SDValue Ops0[] = {
+    DAG.getTargetConstant(AMDGPU::SGPR_64RegClassID, DL, MVT::i32),
+    buildSMovImm32(DAG, DL, 0),
+    DAG.getTargetConstant(AMDGPU::sub0, DL, MVT::i32),
+    buildSMovImm32(DAG, DL, TII->getDefaultRsrcDataFormat() >> 32),
+    DAG.getTargetConstant(AMDGPU::sub1, DL, MVT::i32)
+  };
 
-    SDValue SubRegHi = SDValue(DAG.getMachineNode(AMDGPU::REG_SEQUENCE, DL,
-                                                  MVT::v2i32, Ops0), 0);
+  SDValue SubRegHi = SDValue(DAG.getMachineNode(AMDGPU::REG_SEQUENCE, DL,
+                                                MVT::v2i32, Ops0), 0);
 
-    // Combine the constants and the pointer.
-    const SDValue Ops1[] = {
-      DAG.getTargetConstant(AMDGPU::SReg_128RegClassID, DL, MVT::i32),
-      Ptr,
-      DAG.getTargetConstant(AMDGPU::sub0_sub1, DL, MVT::i32),
-      SubRegHi,
-      DAG.getTargetConstant(AMDGPU::sub2_sub3, DL, MVT::i32)
-    };
+  // Combine the constants and the pointer.
+  const SDValue Ops1[] = {
+    DAG.getTargetConstant(AMDGPU::SReg_128RegClassID, DL, MVT::i32),
+    Ptr,
+    DAG.getTargetConstant(AMDGPU::sub0_sub1, DL, MVT::i32),
+    SubRegHi,
+    DAG.getTargetConstant(AMDGPU::sub2_sub3, DL, MVT::i32)
+  };
 
-    return DAG.getMachineNode(AMDGPU::REG_SEQUENCE, DL, MVT::v4i32, Ops1);
-#else
-    const SDValue Ops[] = {
-      DAG.getTargetConstant(AMDGPU::SReg_128RegClassID, MVT::i32),
-      Ptr,
-      DAG.getTargetConstant(AMDGPU::sub0_sub1, MVT::i32),
-      buildSMovImm32(DAG, DL, 0),
-      DAG.getTargetConstant(AMDGPU::sub2, MVT::i32),
-      buildSMovImm32(DAG, DL, TII->getDefaultRsrcFormat() >> 32),
-      DAG.getTargetConstant(AMDGPU::sub3, MVT::i32)
-    };
-
-    return DAG.getMachineNode(AMDGPU::REG_SEQUENCE, DL, MVT::v4i32, Ops);
-
-#endif
+  return DAG.getMachineNode(AMDGPU::REG_SEQUENCE, DL, MVT::v4i32, Ops1);
 }
 
 /// \brief Return a resource descriptor with the 'Add TID' bit enabled

@@ -19,6 +19,7 @@
 #include "llvm/CodeGen/MachineCombinerPattern.h"
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/MC/MCInstrInfo.h"
+#include "llvm/Support/BranchProbability.h"
 #include "llvm/Target/TargetRegisterInfo.h"
 
 namespace llvm {
@@ -38,7 +39,6 @@ class SelectionDAG;
 class ScheduleDAG;
 class TargetRegisterClass;
 class TargetRegisterInfo;
-class BranchProbability;
 class TargetSubtargetInfo;
 class TargetSchedModel;
 class DFAPacketizer;
@@ -511,7 +511,7 @@ public:
   virtual
   bool isProfitableToIfCvt(MachineBasicBlock &MBB, unsigned NumCycles,
                            unsigned ExtraPredCycles,
-                           const BranchProbability &Probability) const {
+                           BranchProbability Probability) const {
     return false;
   }
 
@@ -526,7 +526,7 @@ public:
                       unsigned NumTCycles, unsigned ExtraTCycles,
                       MachineBasicBlock &FMBB,
                       unsigned NumFCycles, unsigned ExtraFCycles,
-                      const BranchProbability &Probability) const {
+                      BranchProbability Probability) const {
     return false;
   }
 
@@ -538,7 +538,7 @@ public:
   /// will be properly predicted.
   virtual bool
   isProfitableToDupForIfCvt(MachineBasicBlock &MBB, unsigned NumCycles,
-                            const BranchProbability &Probability) const {
+                            BranchProbability Probability) const {
     return false;
   }
 
@@ -724,12 +724,29 @@ public:
   /// order since the pattern evaluator stops checking as soon as it finds a
   /// faster sequence.
   /// \param Root - Instruction that could be combined with one of its operands
-  /// \param Pattern - Vector of possible combination patterns
+  /// \param Patterns - Vector of possible combination patterns
   virtual bool getMachineCombinerPatterns(
       MachineInstr &Root,
-      SmallVectorImpl<MachineCombinerPattern::MC_PATTERN> &Pattern) const {
+      SmallVectorImpl<MachineCombinerPattern::MC_PATTERN> &Patterns) const;
+
+  /// Return true if the input \P Inst is part of a chain of dependent ops
+  /// that are suitable for reassociation, otherwise return false.
+  /// If the instruction's operands must be commuted to have a previous
+  /// instruction of the same type define the first source operand, \P Commuted
+  /// will be set to true.
+  bool isReassociationCandidate(const MachineInstr &Inst, bool &Commuted) const;
+
+  /// Return true when \P Inst is both associative and commutative.
+  virtual bool isAssociativeAndCommutative(const MachineInstr &Inst) const {
     return false;
   }
+
+  /// Return true when \P Inst has reassociable operands in the same \P MBB.
+  virtual bool hasReassociableOperands(const MachineInstr &Inst,
+                                       const MachineBasicBlock *MBB) const;
+
+  /// Return true when \P Inst has reassociable sibling.
+  bool hasReassociableSibling(const MachineInstr &Inst, bool &Commuted) const;
 
   /// When getMachineCombinerPatterns() finds patterns, this function generates
   /// the instructions that could replace the original code sequence. The client
@@ -745,9 +762,23 @@ public:
       MachineInstr &Root, MachineCombinerPattern::MC_PATTERN Pattern,
       SmallVectorImpl<MachineInstr *> &InsInstrs,
       SmallVectorImpl<MachineInstr *> &DelInstrs,
-      DenseMap<unsigned, unsigned> &InstrIdxForVirtReg) const {
+      DenseMap<unsigned, unsigned> &InstrIdxForVirtReg) const;
+
+  /// Attempt to reassociate \P Root and \P Prev according to \P Pattern to
+  /// reduce critical path length.
+  void reassociateOps(MachineInstr &Root, MachineInstr &Prev,
+                      MachineCombinerPattern::MC_PATTERN Pattern,
+                      SmallVectorImpl<MachineInstr *> &InsInstrs,
+                      SmallVectorImpl<MachineInstr *> &DelInstrs,
+                      DenseMap<unsigned, unsigned> &InstrIdxForVirtReg) const;
+
+  /// This is an architecture-specific helper function of reassociateOps.
+  /// Set special operand attributes for new instructions after reassociation.
+  virtual void setSpecialOperandAttr(MachineInstr &OldMI1, MachineInstr &OldMI2,
+                                     MachineInstr &NewMI1,
+                                     MachineInstr &NewMI2) const {
     return;
-  }
+  };
 
   /// Return true when a target supports MachineCombiner.
   virtual bool useMachineCombiner() const { return false; }

@@ -92,9 +92,6 @@ private:
                            int &SPAdj);
   void scavengeFrameVirtualRegs(MachineFunction &Fn);
   void insertPrologEpilogCode(MachineFunction &Fn);
-
-  // Convenience for recognizing return blocks.
-  bool isReturnBlock(const MachineBasicBlock *MBB) const;
 };
 } // namespace
 
@@ -129,10 +126,6 @@ void PEI::getAnalysisUsage(AnalysisUsage &AU) const {
   MachineFunctionPass::getAnalysisUsage(AU);
 }
 
-bool PEI::isReturnBlock(const MachineBasicBlock* MBB) const {
-  return (MBB && !MBB->empty() && MBB->back().isReturn());
-}
-
 /// Compute the set of return blocks
 void PEI::calculateSets(MachineFunction &Fn) {
   const MachineFrameInfo *MFI = Fn.getFrameInfo();
@@ -149,7 +142,7 @@ void PEI::calculateSets(MachineFunction &Fn) {
     // If RestoreBlock does not have any successor and is not a return block
     // then the end point is unreachable and we do not need to insert any
     // epilogue.
-    if (!RestoreBlock->succ_empty() || isReturnBlock(RestoreBlock))
+    if (!RestoreBlock->succ_empty() || RestoreBlock->isReturnBlock())
       RestoreBlocks.push_back(RestoreBlock);
     return;
   }
@@ -159,7 +152,7 @@ void PEI::calculateSets(MachineFunction &Fn) {
   for (MachineBasicBlock &MBB : Fn) {
     if (MBB.isEHFuncletEntry())
       SaveBlocks.push_back(&MBB);
-    if (isReturnBlock(&MBB))
+    if (MBB.isReturnBlock())
       RestoreBlocks.push_back(&MBB);
   }
 }
@@ -196,7 +189,7 @@ bool PEI::runOnMachineFunction(MachineFunction &Fn) {
   // place all spills in the entry block, all restores in return blocks.
   calculateSets(Fn);
 
-  // Add the code to save and restore the callee saved registers
+  // Add the code to save and restore the callee saved registers.
   if (!F->hasFnAttribute(Attribute::Naked))
     insertCSRSpillsAndRestores(Fn);
 
@@ -409,7 +402,7 @@ static void updateLiveness(MachineFunction &MF) {
     const MachineBasicBlock *CurBB = WorkList.pop_back_val();
     // By construction, the region that is after the save point is
     // dominated by the Save and post-dominated by the Restore.
-    if (CurBB == Save)
+    if (CurBB == Save && Save != Restore)
       continue;
     // Enqueue all the successors not already visited.
     // Those are by construction either before Save or after Restore.
@@ -421,10 +414,13 @@ static void updateLiveness(MachineFunction &MF) {
   const std::vector<CalleeSavedInfo> &CSI = MFI->getCalleeSavedInfo();
 
   for (unsigned i = 0, e = CSI.size(); i != e; ++i) {
-    for (MachineBasicBlock *MBB : Visited)
+    for (MachineBasicBlock *MBB : Visited) {
+      MCPhysReg Reg = CSI[i].getReg();
       // Add the callee-saved register as live-in.
       // It's killed at the spill.
-      MBB->addLiveIn(CSI[i].getReg());
+      if (!MBB->isLiveIn(Reg))
+        MBB->addLiveIn(Reg);
+    }
   }
 }
 
@@ -516,7 +512,7 @@ AdjustStackOffset(MachineFrameInfo *MFI, int FrameIdx,
   MaxAlign = std::max(MaxAlign, Align);
 
   // Adjust to alignment boundary.
-  Offset = (Offset + Align - 1) / Align * Align;
+  Offset = RoundUpToAlignment(Offset, Align);
 
   if (StackGrowsDown) {
     DEBUG(dbgs() << "alloc FI(" << FrameIdx << ") at SP[" << -Offset << "]\n");
@@ -819,12 +815,16 @@ void PEI::replaceFrameIndices(MachineFunction &Fn) {
     if (FuncInfo.UnwindHelpFrameIdx != INT_MAX)
       FuncInfo.UnwindHelpFrameOffset = TFI.getFrameIndexReferenceFromSP(
           Fn, FuncInfo.UnwindHelpFrameIdx, FrameReg);
-  } else if (MMI.hasWinEHFuncInfo(F)) {
-    WinEHFuncInfo &FuncInfo = MMI.getWinEHFuncInfo(Fn.getFunction());
-    auto I = FuncInfo.CatchHandlerParentFrameObjIdx.find(F);
-    if (I != FuncInfo.CatchHandlerParentFrameObjIdx.end())
-      FuncInfo.CatchHandlerParentFrameObjOffset[F] =
-          TFI.getFrameIndexReferenceFromSP(Fn, I->second, FrameReg);
+    for (WinEHTryBlockMapEntry &TBME : FuncInfo.TryBlockMap) {
+      for (WinEHHandlerType &H : TBME.HandlerArray) {
+        unsigned UnusedReg;
+        if (H.CatchObj.FrameIndex == INT_MAX)
+          H.CatchObj.FrameOffset = INT_MAX;
+        else
+          H.CatchObj.FrameOffset =
+              TFI.getFrameIndexReference(Fn, H.CatchObj.FrameIndex, UnusedReg);
+      }
+    }
   }
 
   // Store SPAdj at exit of a basic block.
@@ -897,11 +897,11 @@ void PEI::replaceFrameIndices(MachineBasicBlock *BB, MachineFunction &Fn,
       if (!MI->getOperand(i).isFI())
         continue;
 
-      // Frame indicies in debug values are encoded in a target independent
+      // Frame indices in debug values are encoded in a target independent
       // way with simply the frame index and offset rather than any
       // target-specific addressing mode.
       if (MI->isDebugValue()) {
-        assert(i == 0 && "Frame indicies can only appear as the first "
+        assert(i == 0 && "Frame indices can only appear as the first "
                          "operand of a DBG_VALUE machine instruction");
         unsigned Reg;
         MachineOperand &Offset = MI->getOperand(1);

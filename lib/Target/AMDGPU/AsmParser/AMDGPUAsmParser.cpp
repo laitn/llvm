@@ -344,6 +344,7 @@ private:
   bool ParseDirectiveHSACodeObjectISA();
   bool ParseAMDKernelCodeTValue(StringRef ID, amd_kernel_code_t &Header);
   bool ParseDirectiveAMDKernelCodeT();
+  bool ParseSectionDirectiveHSAText();
 
 public:
   AMDGPUAsmParser(MCSubtargetInfo &STI, MCAsmParser &_Parser,
@@ -464,7 +465,7 @@ static unsigned getRegClass(bool IsVgpr, unsigned RegWidth) {
   }
 }
 
-static unsigned getRegForName(const StringRef &RegName) {
+static unsigned getRegForName(StringRef RegName) {
 
   return StringSwitch<unsigned>(RegName)
     .Case("exec", AMDGPU::EXEC)
@@ -485,7 +486,7 @@ bool AMDGPUAsmParser::ParseRegister(unsigned &RegNo, SMLoc &StartLoc, SMLoc &End
   const AsmToken Tok = Parser.getTok();
   StartLoc = Tok.getLoc();
   EndLoc = Tok.getEndLoc();
-  const StringRef &RegName = Tok.getString();
+  StringRef RegName = Tok.getString();
   RegNo = getRegForName(RegName);
 
   if (RegNo) {
@@ -903,6 +904,12 @@ bool AMDGPUAsmParser::ParseDirectiveAMDKernelCodeT() {
   return false;
 }
 
+bool AMDGPUAsmParser::ParseSectionDirectiveHSAText() {
+  getParser().getStreamer().SwitchSection(
+      AMDGPU::getHSATextSection(getContext()));
+  return false;
+}
+
 bool AMDGPUAsmParser::ParseDirective(AsmToken DirectiveID) {
   StringRef IDVal = DirectiveID.getString();
 
@@ -914,6 +921,9 @@ bool AMDGPUAsmParser::ParseDirective(AsmToken DirectiveID) {
 
   if (IDVal == ".amd_kernel_code_t")
     return ParseDirectiveAMDKernelCodeT();
+
+  if (IDVal == ".hsatext" || IDVal == ".text")
+    return ParseSectionDirectiveHSAText();
 
   return true;
 }

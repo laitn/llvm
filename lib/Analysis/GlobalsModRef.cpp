@@ -195,34 +195,34 @@ private:
 void GlobalsAAResult::DeletionCallbackHandle::deleted() {
   Value *V = getValPtr();
   if (auto *F = dyn_cast<Function>(V))
-    GAR.FunctionInfos.erase(F);
+    GAR->FunctionInfos.erase(F);
 
   if (GlobalValue *GV = dyn_cast<GlobalValue>(V)) {
-    if (GAR.NonAddressTakenGlobals.erase(GV)) {
+    if (GAR->NonAddressTakenGlobals.erase(GV)) {
       // This global might be an indirect global.  If so, remove it and
       // remove any AllocRelatedValues for it.
-      if (GAR.IndirectGlobals.erase(GV)) {
+      if (GAR->IndirectGlobals.erase(GV)) {
         // Remove any entries in AllocsForIndirectGlobals for this global.
-        for (auto I = GAR.AllocsForIndirectGlobals.begin(),
-                  E = GAR.AllocsForIndirectGlobals.end();
+        for (auto I = GAR->AllocsForIndirectGlobals.begin(),
+                  E = GAR->AllocsForIndirectGlobals.end();
              I != E; ++I)
           if (I->second == GV)
-            GAR.AllocsForIndirectGlobals.erase(I);
+            GAR->AllocsForIndirectGlobals.erase(I);
       }
 
       // Scan the function info we have collected and remove this global
       // from all of them.
-      for (auto &FIPair : GAR.FunctionInfos)
+      for (auto &FIPair : GAR->FunctionInfos)
         FIPair.second.eraseModRefInfoForGlobal(*GV);
     }
   }
 
   // If this is an allocation related to an indirect global, remove it.
-  GAR.AllocsForIndirectGlobals.erase(V);
+  GAR->AllocsForIndirectGlobals.erase(V);
 
   // And clear out the handle.
   setValPtr(nullptr);
-  GAR.Handles.erase(I);
+  GAR->Handles.erase(I);
   // This object is now destroyed!
 }
 
@@ -358,6 +358,21 @@ bool GlobalsAAResult::AnalyzeUsesOfPointer(Value *V,
         if (isFreeCall(I, &TLI)) {
           if (Writers)
             Writers->insert(CS->getParent()->getParent());
+        } else if (CS.doesNotCapture(CS.getArgumentNo(&U))) {
+          Function *ParentF = CS->getParent()->getParent();
+          // A nocapture argument may be read from or written to, but does not
+          // escape unless the call can somehow recurse.
+          //
+          // nocapture "indicates that the callee does not make any copies of
+          // the pointer that outlive itself". Therefore if we directly or
+          // indirectly recurse, we must treat the pointer as escaping.
+          if (FunctionToSCCMap[ParentF] ==
+              FunctionToSCCMap[CS.getCalledFunction()])
+            return true;
+          if (Readers)
+            Readers->insert(ParentF);
+          if (Writers)
+            Writers->insert(ParentF);
         } else {
           return true; // Argument of an unknown call.
         }
@@ -437,6 +452,21 @@ bool GlobalsAAResult::AnalyzeIndirectGlobalMemory(GlobalValue *GV) {
   Handles.emplace_front(*this, GV);
   Handles.front().I = Handles.begin();
   return true;
+}
+
+void GlobalsAAResult::CollectSCCMembership(CallGraph &CG) {  
+  // We do a bottom-up SCC traversal of the call graph.  In other words, we
+  // visit all callees before callers (leaf-first).
+  unsigned SCCID = 0;
+  for (scc_iterator<CallGraph *> I = scc_begin(&CG); !I.isAtEnd(); ++I) {
+    const std::vector<CallGraphNode *> &SCC = *I;
+    assert(!SCC.empty() && "SCC with no functions?");
+
+    for (auto *CGN : SCC)
+      if (Function *F = CGN->getFunction())
+        FunctionToSCCMap[F] = SCCID;
+    ++SCCID;
+  }
 }
 
 /// AnalyzeCallGraph - At this point, we know the functions where globals are
@@ -765,6 +795,32 @@ AliasResult GlobalsAAResult::alias(const MemoryLocation &LocA,
   return AAResultBase::alias(LocA, LocB);
 }
 
+ModRefInfo GlobalsAAResult::getModRefInfoForArgument(ImmutableCallSite CS,
+                                                     const GlobalValue *GV) {
+  if (CS.doesNotAccessMemory())
+    return MRI_NoModRef;
+  ModRefInfo ConservativeResult = CS.onlyReadsMemory() ? MRI_Ref : MRI_ModRef;
+  
+  // Iterate through all the arguments to the called function. If any argument
+  // is based on GV, return the conservative result.
+  for (auto &A : CS.args()) {
+    SmallVector<Value*, 4> Objects;
+    GetUnderlyingObjects(A, Objects, DL);
+    
+    // All objects must be identified.
+    if (!std::all_of(Objects.begin(), Objects.end(), [&GV](const Value *V) {
+          return isIdentifiedObject(V);
+        }))
+      return ConservativeResult;
+
+    if (std::find(Objects.begin(), Objects.end(), GV) != Objects.end())
+      return ConservativeResult;
+  }
+
+  // We identified all objects in the argument list, and none of them were GV.
+  return MRI_NoModRef;
+}
+
 ModRefInfo GlobalsAAResult::getModRefInfo(ImmutableCallSite CS,
                                           const MemoryLocation &Loc) {
   unsigned Known = MRI_ModRef;
@@ -777,7 +833,8 @@ ModRefInfo GlobalsAAResult::getModRefInfo(ImmutableCallSite CS,
       if (const Function *F = CS.getCalledFunction())
         if (NonAddressTakenGlobals.count(GV))
           if (const FunctionInfo *FI = getFunctionInfo(F))
-            Known = FI->getModRefInfoForGlobal(*GV);
+            Known = FI->getModRefInfoForGlobal(*GV) |
+              getModRefInfoForArgument(CS, GV);
 
   if (Known == MRI_NoModRef)
     return MRI_NoModRef; // No need to query other mod/ref analyses
@@ -789,12 +846,26 @@ GlobalsAAResult::GlobalsAAResult(const DataLayout &DL,
     : AAResultBase(TLI), DL(DL) {}
 
 GlobalsAAResult::GlobalsAAResult(GlobalsAAResult &&Arg)
-    : AAResultBase(std::move(Arg)), DL(Arg.DL) {}
+    : AAResultBase(std::move(Arg)), DL(Arg.DL),
+      NonAddressTakenGlobals(std::move(Arg.NonAddressTakenGlobals)),
+      IndirectGlobals(std::move(Arg.IndirectGlobals)),
+      AllocsForIndirectGlobals(std::move(Arg.AllocsForIndirectGlobals)),
+      FunctionInfos(std::move(Arg.FunctionInfos)),
+      Handles(std::move(Arg.Handles)) {
+  // Update the parent for each DeletionCallbackHandle.
+  for (auto &H : Handles) {
+    assert(H.GAR == &Arg);
+    H.GAR = this;
+  }
+}
 
 /*static*/ GlobalsAAResult
 GlobalsAAResult::analyzeModule(Module &M, const TargetLibraryInfo &TLI,
                                CallGraph &CG) {
   GlobalsAAResult Result(M.getDataLayout(), TLI);
+
+  // Discover which functions aren't recursive, to feed into AnalyzeGlobals.
+  Result.CollectSCCMembership(CG);
 
   // Find non-addr taken globals.
   Result.AnalyzeGlobals(M);

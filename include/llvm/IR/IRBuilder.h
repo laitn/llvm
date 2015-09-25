@@ -24,6 +24,7 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Operator.h"
 #include "llvm/IR/ValueHandle.h"
@@ -51,6 +52,7 @@ protected:
 /// \brief Common base class shared among various IRBuilders.
 class IRBuilderBase {
   DebugLoc CurDbgLocation;
+
 protected:
   BasicBlock *BB;
   BasicBlock::iterator InsertPt;
@@ -58,8 +60,8 @@ protected:
 
   MDNode *DefaultFPMathTag;
   FastMathFlags FMF;
-public:
 
+public:
   IRBuilderBase(LLVMContext &context, MDNode *FPMathTag = nullptr)
     : Context(context), DefaultFPMathTag(FPMathTag), FMF() {
     ClearInsertionPoint();
@@ -313,10 +315,8 @@ public:
   }
 
   /// \brief Fetch the type representing a 128-bit integer.
-  IntegerType *getInt128Ty() {
-    return Type::getInt128Ty(Context);
-  }
-  
+  IntegerType *getInt128Ty() { return Type::getInt128Ty(Context); }
+
   /// \brief Fetch the type representing an N-bit integer.
   IntegerType *getIntNTy(unsigned N) {
     return Type::getIntNTy(Context, N);
@@ -516,6 +516,7 @@ template<bool preserveNames = true, typename T = ConstantFolder,
          typename Inserter = IRBuilderDefaultInserter<preserveNames> >
 class IRBuilder : public IRBuilderBase, public Inserter {
   T Folder;
+
 public:
   IRBuilder(LLVMContext &C, const T &F, Inserter I = Inserter(),
             MDNode *FPMathTag = nullptr)
@@ -681,8 +682,8 @@ public:
     return Insert(CleanupReturnInst::Create(CleanupPad, UnwindBB));
   }
 
-  CatchEndPadInst *CreateCleanupEndPad(CleanupPadInst *CleanupPad,
-                                       BasicBlock *UnwindBB = nullptr) {
+  CleanupEndPadInst *CreateCleanupEndPad(CleanupPadInst *CleanupPad,
+                                         BasicBlock *UnwindBB = nullptr) {
     return Insert(CleanupEndPadInst::Create(CleanupPad, UnwindBB));
   }
 
@@ -738,6 +739,7 @@ private:
     I->setFastMathFlags(FMF);
     return I;
   }
+
 public:
   Value *CreateAdd(Value *LHS, Value *RHS, const Twine &Name = "",
                    bool HasNUW = false, bool HasNSW = false) {
@@ -1373,11 +1375,13 @@ public:
 
     return CreateBitCast(V, DestTy, Name);
   }
+
 private:
   // \brief Provided to resolve 'CreateIntCast(Ptr, Ptr, "...")', giving a
   // compile time error, instead of converting the string to bool for the
   // isSigned parameter.
   Value *CreateIntCast(Value *, Type *, const char *) = delete;
+
 public:
   Value *CreateFPCast(Value *V, Type *DestTy, const Twine &Name = "") {
     if (V->getType() == DestTy)
@@ -1634,6 +1638,32 @@ public:
                            Name);
   }
 
+  /// \brief Create an invariant.group.barrier intrinsic call, that stops
+  /// optimizer to propagate equality using invariant.group metadata.
+  /// If Ptr type is different from i8*, it's casted to i8* before call
+  /// and casted back to Ptr type after call.
+  Value *CreateInvariantGroupBarrier(Value *Ptr) {
+    Module *M = BB->getParent()->getParent();
+    Function *FnInvariantGroupBarrier = Intrinsic::getDeclaration(M,
+            Intrinsic::invariant_group_barrier);
+
+    Type *ArgumentAndReturnType = FnInvariantGroupBarrier->getReturnType();
+    assert(ArgumentAndReturnType ==
+        FnInvariantGroupBarrier->getFunctionType()->getParamType(0) &&
+        "InvariantGroupBarrier should take and return the same type");
+    Type *PtrType = Ptr->getType();
+
+    bool PtrTypeConversionNeeded = PtrType != ArgumentAndReturnType;
+    if (PtrTypeConversionNeeded)
+      Ptr = CreateBitCast(Ptr, ArgumentAndReturnType);
+
+    CallInst *Fn = CreateCall(FnInvariantGroupBarrier, {Ptr});
+
+    if (PtrTypeConversionNeeded)
+      return CreateBitCast(Fn, PtrType);
+    return Fn;
+  }
+
   /// \brief Return a vector value that contains \arg V broadcasted to \p
   /// NumElts elements.
   Value *CreateVectorSplat(unsigned NumElts, Value *V, const Twine &Name = "") {
@@ -1715,7 +1745,6 @@ public:
 
 // Create wrappers for C Binding types (see CBindingWrapping.h).
 DEFINE_SIMPLE_CONVERSION_FUNCTIONS(IRBuilder<>, LLVMBuilderRef)
-
 }
 
 #endif

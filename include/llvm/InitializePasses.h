@@ -239,7 +239,7 @@ void initializeRegionViewerPass(PassRegistry&);
 void initializeRewriteStatepointsForGCPass(PassRegistry&);
 void initializeSafeStackPass(PassRegistry&);
 void initializeSCCPPass(PassRegistry&);
-void initializeSROAPass(PassRegistry&);
+void initializeSROALegacyPassPass(PassRegistry&);
 void initializeSROA_DTPass(PassRegistry&);
 void initializeSROA_SSAUpPass(PassRegistry&);
 void initializeSCEVAAWrapperPassPass(PassRegistry&);
@@ -299,6 +299,7 @@ void initializeFloat2IntPass(PassRegistry&);
 void initializeLoopDistributePass(PassRegistry&);
 void initializeSjLjEHPreparePass(PassRegistry&);
 void initializeDemandedBitsPass(PassRegistry&);
+void initializeFuncletLayoutPass(PassRegistry &);
 }
 
 #endif

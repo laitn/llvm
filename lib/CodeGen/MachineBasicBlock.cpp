@@ -28,7 +28,6 @@
 #include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/MCContext.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/Format.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetInstrInfo.h"
 #include "llvm/Target/TargetMachine.h"
@@ -208,6 +207,13 @@ const MachineBasicBlock *MachineBasicBlock::getLandingPadSuccessor() const {
   return nullptr;
 }
 
+bool MachineBasicBlock::hasEHPadSuccessor() const {
+  for (const_succ_iterator I = succ_begin(), E = succ_end(); I != E; ++I)
+    if ((*I)->isEHPad())
+      return true;
+  return false;
+}
+
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
 void MachineBasicBlock::dump() const {
   print(dbgs());
@@ -281,7 +287,7 @@ void MachineBasicBlock::print(raw_ostream &OS, ModuleSlotTracker &MST,
     for (const auto &LI : make_range(livein_begin(), livein_end())) {
       OS << ' ' << PrintReg(LI.PhysReg, TRI);
       if (LI.LaneMask != ~0u)
-        OS << format(":%08X", LI.LaneMask);
+        OS << ':' << PrintLaneMask(LI.LaneMask);
     }
     OS << '\n';
   }
@@ -324,7 +330,7 @@ void MachineBasicBlock::printAsOperand(raw_ostream &OS,
   OS << "BB#" << getNumber();
 }
 
-void MachineBasicBlock::removeLiveIn(MCPhysReg Reg, unsigned LaneMask) {
+void MachineBasicBlock::removeLiveIn(MCPhysReg Reg, LaneBitmask LaneMask) {
   LiveInVector::iterator I = std::find_if(
       LiveIns.begin(), LiveIns.end(),
       [Reg] (const RegisterMaskPair &LI) { return LI.PhysReg == Reg; });
@@ -336,7 +342,7 @@ void MachineBasicBlock::removeLiveIn(MCPhysReg Reg, unsigned LaneMask) {
     LiveIns.erase(I);
 }
 
-bool MachineBasicBlock::isLiveIn(MCPhysReg Reg, unsigned LaneMask) const {
+bool MachineBasicBlock::isLiveIn(MCPhysReg Reg, LaneBitmask LaneMask) const {
   livein_iterator I = std::find_if(
       LiveIns.begin(), LiveIns.end(),
       [Reg] (const RegisterMaskPair &LI) { return LI.PhysReg == Reg; });
@@ -354,7 +360,7 @@ void MachineBasicBlock::sortUniqueLiveIns() {
   LiveInVector::iterator Out = LiveIns.begin();
   for (; I != LiveIns.end(); ++Out, I = J) {
     unsigned PhysReg = I->PhysReg;
-    unsigned LaneMask = I->LaneMask;
+    LaneBitmask LaneMask = I->LaneMask;
     for (J = std::next(I); J != LiveIns.end() && J->PhysReg == PhysReg; ++J)
       LaneMask |= J->LaneMask;
     Out->PhysReg = PhysReg;
@@ -810,8 +816,7 @@ MachineBasicBlock::SplitCriticalEdge(MachineBasicBlock *Succ, Pass *P) {
   NMBB->addSuccessor(Succ);
   if (!NMBB->isLayoutSuccessor(Succ)) {
     Cond.clear();
-    MF->getSubtarget().getInstrInfo()->InsertBranch(*NMBB, Succ, nullptr, Cond,
-                                                    dl);
+    TII->InsertBranch(*NMBB, Succ, nullptr, Cond, dl);
 
     if (Indexes) {
       for (instr_iterator I = NMBB->instr_begin(), E = NMBB->instr_end();
