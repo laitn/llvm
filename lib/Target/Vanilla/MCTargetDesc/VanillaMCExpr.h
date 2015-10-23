@@ -62,8 +62,8 @@ public:
                                  const MCAsmLayout *Layout,
                                  const MCFixup *Fixup) const override;
   void visitUsedExpr(MCStreamer &Streamer) const override;
-  MCSection *findAssociatedSection() const override {
-    return getSubExpr()->findAssociatedSection();
+  MCFragment *findAssociatedFragment() const override{
+    llvm_unreachable("FIXME: what goes here?");
   }
   
   void fixELFSymbolsInTLSFixups(MCAssembler &Asm) const override;

@@ -1,4 +1,4 @@
-//===- Hello.cpp - Example code from "Writing an LLVM Pass" ---------------===//
+//===- OSR.cpp - Code for operator strength reduction ---------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,8 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements two versions of the LLVM "Hello World" pass described
-// in docs/WritingAnLLVMPass.html
+// This file implements operator strength reduction.
 //
 //===----------------------------------------------------------------------===//
 
@@ -23,7 +22,7 @@ using namespace llvm;
 
 #define DEBUG_TYPE "osr"
 
-STATISTIC(HelloCounter, "Counts number of functions greeted");
+STATISTIC(OpCounter, "Counts number of operators reducted.");
 
 namespace {
   struct OSR : public FunctionPass {
@@ -60,7 +59,7 @@ bool OSR::runOnFunction(Function &Fn){
   for (Function::iterator BB = Fn.begin(); BB != Fn.end(); ++BB) {
     for(BasicBlock::iterator I=BB->begin();I!=BB->end();){
       if (strcmp(I->getOpcodeName(),"mul")==0){
-        //Fn.dump();
+        Fn.dump();
         // construct blocks;
         std::string mul_init_name="mul.init"+std::to_string(mul_count);
         std::string mul_cond_name="mul.cond"+std::to_string(mul_count);
@@ -104,8 +103,8 @@ bool OSR::runOnFunction(Function &Fn){
         //   if_cond =icmp icmp_eq, rhs_and_1, 1;
         //   new_res= add res0, lhs0
         //   res1 = select if_cond, new_res, res0
-        //   lhs1 = shra lhs0, 1
-        //   rhs1 = shl rhs0, 1
+        //   lhs1 = shl lhs0, 1
+        //   rhs1 = shra rhs0, 1
         //   store res1, res_alloc
         //   store lhs1, lhs_alloc
         //   store rhs1, rhs_alloc
@@ -149,8 +148,8 @@ bool OSR::runOnFunction(Function &Fn){
         Value *if_cond=Builder2.CreateICmp(CmpInst::Predicate::ICMP_EQ, rhs_and_1, ConstantInt::get(rhs_and_1->getType(),1));
         Value *new_res=Builder2.CreateAdd(res0,lhs0);
         Value *res1=Builder2.CreateSelect(if_cond, new_res, res0);
-        Value *lhs1=Builder2.CreateLShr(lhs0, ConstantInt::get(lhs0->getType(),1));
-        Value *rhs1=Builder2.CreateShl(rhs0, ConstantInt::get(rhs0->getType(),1));
+        Value *lhs1=Builder2.CreateShl(lhs0, ConstantInt::get(lhs0->getType(),1));
+        Value *rhs1=Builder2.CreateLShr(rhs0, ConstantInt::get(rhs0->getType(),1));
         Builder2.CreateStore(res1, res_alloc);
         Builder2.CreateStore(lhs1, lhs_load->getOperand(0));
         Builder2.CreateStore(rhs1, rhs_load->getOperand(0));
@@ -181,8 +180,9 @@ bool OSR::runOnFunction(Function &Fn){
         BB=mul_inc;
         //to_remove->eraseFromParent();
         
-        //Fn.dump();
+        Fn.dump();
         mul_count++;
+        OpCounter++;
       }
       else{
         I++;
