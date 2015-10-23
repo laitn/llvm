@@ -510,7 +510,7 @@ SDValue SITargetLowering::LowerFormalArguments(
   FunctionType *FType = MF.getFunction()->getFunctionType();
   SIMachineFunctionInfo *Info = MF.getInfo<SIMachineFunctionInfo>();
 
-  assert(CallConv == CallingConv::C);
+  // FIXME: We currently assume all calling conventions are kernels.
 
   SmallVector<ISD::InputArg, 16> Splits;
   BitVector Skipped(Ins.size());
@@ -2144,9 +2144,14 @@ void SITargetLowering::AdjustInstrPostInstrSelection(MachineInstr *MI,
       static_cast<const SIInstrInfo *>(Subtarget->getInstrInfo());
 
   MachineRegisterInfo &MRI = MI->getParent()->getParent()->getRegInfo();
-  TII->legalizeOperands(MI);
 
-  if (TII->isMIMG(MI->getOpcode())) {
+  if (TII->isVOP3(MI->getOpcode())) {
+    // Make sure constant bus requirements are respected.
+    TII->legalizeOperandsVOP3(MRI, MI);
+    return;
+  }
+
+  if (TII->isMIMG(*MI)) {
     unsigned VReg = MI->getOperand(0).getReg();
     unsigned Writemask = MI->getOperand(1).getImm();
     unsigned BitsSet = 0;
@@ -2257,10 +2262,8 @@ MachineSDNode *SITargetLowering::buildScratchRSRC(SelectionDAG &DAG,
                                                   SDValue Ptr) const {
   const SIInstrInfo *TII =
       static_cast<const SIInstrInfo *>(Subtarget->getInstrInfo());
-  uint64_t Rsrc = TII->getDefaultRsrcDataFormat() | AMDGPU::RSRC_TID_ENABLE |
-                  0xffffffff; // Size
 
-  return buildRSRC(DAG, DL, Ptr, 0, Rsrc);
+  return buildRSRC(DAG, DL, Ptr, 0, TII->getScratchRsrcWords23());
 }
 
 SDValue SITargetLowering::CreateLiveInRegister(SelectionDAG &DAG,

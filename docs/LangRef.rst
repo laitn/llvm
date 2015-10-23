@@ -715,7 +715,7 @@ Aliases may have an optional :ref:`linkage type <linkage>`, an optional
 
 Syntax::
 
-    @<Name> = [Linkage] [Visibility] [DLLStorageClass] [ThreadLocal] [unnamed_addr] alias <AliaseeTy> @<Aliasee>
+    @<Name> = [Linkage] [Visibility] [DLLStorageClass] [ThreadLocal] [unnamed_addr] alias <AliaseeTy>, <AliaseeTy>* @<Aliasee>
 
 The linkage must be one of ``private``, ``internal``, ``linkonce``, ``weak``,
 ``linkonce_odr``, ``weak_odr``, ``external``. Note that some system linkers
@@ -1219,10 +1219,8 @@ example:
 ``convergent``
     This attribute indicates that the callee is dependent on a convergent
     thread execution pattern under certain parallel execution models.
-    Transformations that are execution model agnostic may only move or
-    tranform this call if the final location is control equivalent to its
-    original position in the program, where control equivalence is defined as
-    A dominates B and B post-dominates A, or vice versa.
+    Transformations that are execution model agnostic may not make the execution
+    of a convergent operation control dependent on any additional values.
 ``inlinehint``
     This attribute indicates that the source code contained a hint that
     inlining this function is desirable (such as the "inline" keyword in
@@ -1453,6 +1451,7 @@ with certain LLVM instructions (currently only ``call`` s and
 incorrect and will change program semantics.
 
 Syntax::
+
     operand bundle set ::= '[' operand bundle ']'
     operand bundle ::= tag '(' [ bundle operand ] (, bundle operand )* ')'
     bundle operand ::= SSA value
@@ -1474,16 +1473,15 @@ long as the behavior of an operand bundle is describable within these
 restrictions, LLVM does not need to have special knowledge of the
 operand bundle to not miscompile programs containing it.
 
- - The bundle operands for an unknown operand bundle escape in unknown
-   ways before control is transferred to the callee or invokee.
-
- - Calls and invokes with operand bundles have unknown read / write
-   effect on the heap on entry and exit (even if the call target is
-   ``readnone`` or ``readonly``).
-
- - An operand bundle at a call site cannot change the implementation
-   of the called function.  Inter-procedural optimizations work as
-   usual as long as they take into account the first two properties.
+- The bundle operands for an unknown operand bundle escape in unknown
+  ways before control is transferred to the callee or invokee.
+- Calls and invokes with operand bundles have unknown read / write
+  effect on the heap on entry and exit (even if the call target is
+  ``readnone`` or ``readonly``), unless they're overriden with
+  callsite specific attributes.
+- An operand bundle at a call site cannot change the implementation
+  of the called function.  Inter-procedural optimizations work as
+  usual as long as they take into account the first two properties.
 
 .. _moduleasm:
 
@@ -6713,7 +6711,7 @@ Arguments:
 """"""""""
 
 The first operand of an '``extractvalue``' instruction is a value of
-:ref:`struct <t_struct>` or :ref:`array <t_array>` type. The operands are
+:ref:`struct <t_struct>` or :ref:`array <t_array>` type. The other operands are
 constant indices to specify which value to extract in a similar manner
 as indices in a '``getelementptr``' instruction.
 
@@ -6860,10 +6858,11 @@ Syntax:
 
 ::
 
-      <result> = load [volatile] <ty>, <ty>* <pointer>[, align <alignment>][, !nontemporal !<index>][, !invariant.load !<index>][, !invariant.group !<index>][, !nonnull !<index>][, !dereferenceable !<deref_bytes_node>][, !dereferenceable_or_null !<deref_bytes_node>]
+      <result> = load [volatile] <ty>, <ty>* <pointer>[, align <alignment>][, !nontemporal !<index>][, !invariant.load !<index>][, !invariant.group !<index>][, !nonnull !<index>][, !dereferenceable !<deref_bytes_node>][, !dereferenceable_or_null !<deref_bytes_node>][, !align !<align_node>]
       <result> = load atomic [volatile] <ty>* <pointer> [singlethread] <ordering>, align <alignment> [, !invariant.group !<index>]
       !<index> = !{ i32 1 }
       !<deref_bytes_node> = !{i64 <dereferenceable_bytes>}
+      !<align_node> = !{ i64 <value_alignment> }
 
 Overview:
 """""""""
@@ -6947,6 +6946,14 @@ The number of bytes known to be dereferenceable is specified by the integer
 value in the metadata node. This is analogous to the ''dereferenceable_or_null''
 attribute on parameters and return values. This metadata can only be applied
 to loads of a pointer type.
+
+The optional ``!align`` metadata must reference a single metadata name
+``<align_node>`` corresponding to a metadata node with one ``i64`` entry.
+The existence of the ``!align`` metadata on the instruction tells the
+optimizer that the value loaded is known to be aligned to a boundary specified
+by the integer value in the metadata node. The alignment must be a power of 2.
+This is analogous to the ''align'' attribute on parameters and return values.
+This metadata can only be applied to loads of a pointer type.
 
 Semantics:
 """"""""""
