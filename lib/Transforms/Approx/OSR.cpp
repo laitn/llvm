@@ -38,7 +38,7 @@ namespace {
 }
 
 char OSR::ID = 0;
-INITIALIZE_PASS(OSR, "osr", "hapy", false, false)
+INITIALIZE_PASS(OSR, "osr", "Operator strength reduction.", false, false)
 
 Pass *llvm::createOSRPass() {
   return new OSR();
@@ -66,7 +66,7 @@ bool OSR::runOnFunction(Function &Fn){
   for (Function::iterator BB = Fn.begin(); BB != Fn.end(); ++BB) {
     for(BasicBlock::iterator I=BB->begin();I!=BB->end();){
       if (strcmp(I->getOpcodeName(),"mul")==0){
-        Fn.dump();
+        //Fn.dump();
         // construct blocks;
         std::string mul_init_name="mul.init"+std::to_string(mul_count);
         std::string mul_cond_name="mul.cond"+std::to_string(mul_count);
@@ -187,7 +187,7 @@ bool OSR::runOnFunction(Function &Fn){
         BB=mul_inc;
         //to_remove->eraseFromParent();
         
-        Fn.dump();
+        //Fn.dump();
         mul_count++;
         OpCounter++;
       }
