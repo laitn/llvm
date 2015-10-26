@@ -309,6 +309,7 @@ int main(int argc, char **argv) {
   initializeCore(Registry);
   initializeScalarOpts(Registry);
   initializeObjCARCOpts(Registry);
+  initializeApproximation(Registry);
   initializeVectorization(Registry);
   initializeIPO(Registry);
   initializeAnalysis(Registry);
