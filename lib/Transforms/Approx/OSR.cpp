@@ -11,6 +11,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/Transforms/Approx.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/LLVMContext.h"
@@ -35,7 +36,13 @@ namespace {
 }
 
 char OSR::ID = 0;
-static RegisterPass<OSR> X("osr", "Operator Strength Pass");
+static RegisterPass<OSR> X("osr", "Operator Strength Reduction pass");
+
+//INITIALIZE_PASS(OSR, "osr", "hapy", false, false)
+
+Pass *llvm::createOSRPass() {
+  return new OSR();
+}
 
 void OSR::replaceAllUsesWith_stackload(Value *oldv, Value *addr){
   for(auto user=oldv->user_begin();user!=oldv->user_end();user++){

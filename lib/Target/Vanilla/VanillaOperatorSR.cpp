@@ -36,7 +36,7 @@ public:
 };
 }
 
-FunctionPass *llvm::createVanillaOperatorSRPass() { return new VanillaOperatorSRPass(); }
+//FunctionPass *llvm::createVanillaOperatorSRPass() { return new VanillaOperatorSRPass(); }
 
 char VanillaOperatorSRPass::ID = 0;
 
