@@ -39,6 +39,10 @@ void initializeObjCARCOpts(PassRegistry&);
 /// Vectorize library.
 void initializeVectorization(PassRegistry&);
 
+/// initializeApproximtion - Initialize all passes linked into the
+/// Approx library.
+void initializeApproximation(PassRegistry&);
+
 /// initializeInstCombine - Initialize all passes linked into the
 /// InstCombine library.
 void initializeInstCombine(PassRegistry&);
@@ -209,6 +213,7 @@ void initializeObjCARCAAWrapperPassPass(PassRegistry&);
 void initializeObjCARCAPElimPass(PassRegistry&);
 void initializeObjCARCExpandPass(PassRegistry&);
 void initializeObjCARCContractPass(PassRegistry&);
+void initializeOSRPass(PassRegistry&);
 void initializeObjCARCOptPass(PassRegistry&);
 void initializePAEvalPass(PassRegistry &);
 void initializeOptimizePHIsPass(PassRegistry&);

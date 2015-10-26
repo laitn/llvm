@@ -28,7 +28,9 @@ STATISTIC(OpCounter, "Counts number of operators reducted.");
 namespace {
   struct OSR : public FunctionPass {
     static char ID; // Pass identification, replacement for typeid
-    OSR() : FunctionPass(ID) {}
+    OSR() : FunctionPass(ID) {
+      initializeOSRPass(*PassRegistry::getPassRegistry());
+    }
 
     bool runOnFunction(Function &F) override ;
     void replaceAllUsesWith_stackload(Value *oldv, Value *newv);
@@ -36,9 +38,7 @@ namespace {
 }
 
 char OSR::ID = 0;
-static RegisterPass<OSR> X("osr", "Operator Strength Reduction pass");
-
-//INITIALIZE_PASS(OSR, "osr", "hapy", false, false)
+INITIALIZE_PASS(OSR, "osr", "hapy", false, false)
 
 Pass *llvm::createOSRPass() {
   return new OSR();

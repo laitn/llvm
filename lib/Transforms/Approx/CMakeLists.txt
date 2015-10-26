@@ -1,4 +1,5 @@
 add_llvm_library(LLVMApprox
+  Approx.cpp
   OSR.cpp
 
   ADDITIONAL_HEADER_DIRS
