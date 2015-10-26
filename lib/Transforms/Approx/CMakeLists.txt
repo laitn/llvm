@@ -1,18 +1,8 @@
-# If we don't need RTTI or EH, there's no reason to export anything
-# from the hello plugin.
-if( NOT LLVM_REQUIRES_RTTI )
-  if( NOT LLVM_REQUIRES_EH )
-    set(LLVM_EXPORTED_SYMBOL_FILE ${CMAKE_CURRENT_SOURCE_DIR}/Approx.exports)
-  endif()
-endif()
-
-if(WIN32 OR CYGWIN)
-  set(LLVM_LINK_COMPONENTS Core Support)
-endif()
-
-add_llvm_loadable_module( LLVMApprox
+add_llvm_library(LLVMApprox
   OSR.cpp
 
-  DEPENDS
-  intrinsics_gen
+  ADDITIONAL_HEADER_DIRS
+  ${LLVM_MAIN_INCLUDE_DIR}/llvm/Transforms
   )
+
+add_dependencies(LLVMApprox intrinsics_gen)

@@ -51,7 +51,7 @@ public:
     return getTM<VanillaTargetMachine>();
   }
 
-  void addIRPasses() override;
+  //void addIRPasses() override;
   bool addInstSelector() override;
   void addPreEmitPass() override;
 };
@@ -61,10 +61,10 @@ TargetPassConfig *VanillaTargetMachine::createPassConfig(PassManagerBase &PM) {
   return new VanillaPassConfig(this, PM);
 }
 
-void VanillaPassConfig::addIRPasses(){
-  addPass(createVanillaOperatorSRPass());
-  TargetPassConfig::addIRPasses();
-}
+//void VanillaPassConfig::addIRPasses(){
+  //addPass(createVanillaOperatorSRPass());
+  //TargetPassConfig::addIRPasses();
+//}
 
 // Install an instruction selector pass using
 // the ISelDag to gen Vanilla code.

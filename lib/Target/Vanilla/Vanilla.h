@@ -23,7 +23,7 @@ namespace llvm {
 
   FunctionPass *createVanillaISelDag(VanillaTargetMachine &TM);
   FunctionPass *createVanillaVerifierPass(TargetMachine &TM);
-  FunctionPass *createVanillaOperatorSRPass();
+  //FunctionPass *createVanillaOperatorSRPass();
 
 } // end namespace llvm;
 
