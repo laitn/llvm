@@ -16,13 +16,14 @@
 #include "llvm-c/Initialization.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Analysis/Passes.h"
+#include "llvm/IR/LegacyPassManager.h"
 
 namespace llvm {
   class PassRegistry;
 }
 
 using namespace llvm;
-using namespace llvm::objcarc;
 
 /// initializeApproximation - Initialize all passes linked into the
 /// Approx library.
