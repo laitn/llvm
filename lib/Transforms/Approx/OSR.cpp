@@ -49,7 +49,7 @@ void OSR::replaceAllUsesWith_stackload(Value *oldv, Value *addr){
     //errs()<<"new use";addr->dump();
     IRBuilder<> Builder((Instruction*)*user);
     Value *load=Builder.CreateLoad(addr);
-    for(int i=0;i<user->getNumOperands();i++){
+    for(unsigned int i=0;i<user->getNumOperands();i++){
       if(user->getOperand(i)==oldv){
         //errs()<<"GOT IT:";
         //user->getOperand(i)->dump();
