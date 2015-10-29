@@ -237,3 +237,11 @@ def : Pat<(i32 imm:$val), (APPI (APPI (APPI (MOVI (TOP2 imm:$val)), (HI10 imm:$v
 
 //load a global address into register.
 def : Pat<(Vanillawrapper tglobaladdr:$in), (MOVI tglobaladdr:$in)>;
+
+// Select instructions.
+let usesCustomInserter = 1 in {
+  def Select : Pseudo<(outs GPR:$dst), (ins GPR:$lhs, GPR:$rhs, GPR:$imm, GPR:$src, GPR:$src2),
+                      "# Select PSEUDO $dst = $lhs $imm $rhs ? $src : $src2",
+                      [(set i32:$dst,
+                      (Vanillaselectcc i32:$lhs, i32:$rhs, i32:$imm, i32:$src, i32:$src2))]>;
+}
