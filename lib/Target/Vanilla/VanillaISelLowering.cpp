@@ -68,8 +68,8 @@ SDValue VanillaTargetLowering::LowerOperation(SDValue Op, SelectionDAG &DAG) con
       return LowerGlobalAddress(Op, DAG);
     case ISD::MUL:
       return LowerMUL(Op, DAG);
-    case ISD::SELECT:
-      return LowerSELECT(Op, DAG);
+    case ISD::SELECT_CC:
+      return LowerSELECT_CC(Op, DAG);
   }
 }
 
@@ -94,6 +94,12 @@ const char *VanillaTargetLowering::getTargetNodeName(unsigned Opcode) const {
 MachineBasicBlock *
 VanillaTargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
                                                MachineBasicBlock *BB) const {
+//  if(MI->getOpcode() == Vanilla::Select){
+//    BB->dump();
+//  }
+//  else{
+    llvm_unreachable("unhandled custom inserted instruction.");
+//  }
   return BB;
 }
 
@@ -231,8 +237,20 @@ SDValue VanillaTargetLowering::LowerBR_CC(SDValue Op, SelectionDAG &DAG) const {
                      DAG.getConstant(CC, DL, MVT::i32), Dest);
 }
 
-SDValue VanillaTargetLowering::LowerSELECT(SDValue Op, SelectionDAG &DAG) const {
-  return Op;
+SDValue VanillaTargetLowering::LowerSELECT_CC(SDValue Op, SelectionDAG &DAG) const {
+  SDValue LHS = Op.getOperand(0);
+  SDValue RHS = Op.getOperand(1);
+  SDValue TrueV = Op.getOperand(2);
+  SDValue FalseV = Op.getOperand(3);
+  ISD::CondCode CC = cast<CondCodeSDNode>(Op.getOperand(4))->get();
+  SDLoc DL(Op);
+  
+  SDValue TargetCC = DAG.getConstant(CC, DL, MVT::i32);
+  
+  SDVTList VTs = DAG.getVTList(Op.getValueType(), MVT::Glue);
+  SDValue Ops[] = {LHS, RHS, TargetCC, TrueV, FalseV};
+  return DAG.getNode(VanillaISD::SELECT_CC, DL, VTs, Ops);
+  //return Op;
 }
 
 SDValue VanillaTargetLowering::LowerMUL(SDValue Op, SelectionDAG &DAG) const {

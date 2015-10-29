@@ -71,7 +71,7 @@ public:
 private:
   SDValue LowerBR_CC(SDValue Op, SelectionDAG &DAG) const;
   SDValue LowerMUL(SDValue Op, SelectionDAG &DAG) const;
-  SDValue LowerSELECT(SDValue Op, SelectionDAG &DAG) const;
+  SDValue LowerSELECT_CC(SDValue Op, SelectionDAG &DAG) const;
 };
 }
 
