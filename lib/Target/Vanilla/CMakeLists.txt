@@ -1,3 +1,7 @@
+set(LLVM_LINK_COMPONENTS
+Approx
+)
+
 set(LLVM_TARGET_DEFINITIONS Vanilla.td)
 
 tablegen(LLVM VanillaGenRegisterInfo.inc -gen-register-info)
