@@ -130,11 +130,10 @@ VanillaTargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
     int TargetCC = MI->getOperand(3).getImm();
     unsigned TrueV = MI->getOperand(4).getReg();
     unsigned FalseV = MI->getOperand(5).getReg();
-    //unsigned newR=BB->getParent()->getRegInfo().createVirtualRegister(&Vanilla::GPRRegClass);
     unsigned newR=Vanilla::R1;
     BuildMI(BB, DL, TII.get(Vanilla::MOV)).addReg(DST).addReg(FalseV);
     BuildMI(BB, DL, TII.get(Vanilla::MOV)).addReg(newR).addReg(LHS);
-    BuildMI(BB, DL, TII.get(Vanilla::SLT)).addReg(newR).addReg(RHS);
+    BuildMI(BB, DL, TII.get(Vanilla::SLT)).addReg(newR).addReg(newR).addReg(RHS);
     switch (TargetCC) {
       case ISD::SETGT:
         llvm_unreachable("SETGT");
