@@ -94,12 +94,82 @@ const char *VanillaTargetLowering::getTargetNodeName(unsigned Opcode) const {
 MachineBasicBlock *
 VanillaTargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
                                                MachineBasicBlock *BB) const {
-//  if(MI->getOpcode() == Vanilla::Select){
-//    BB->dump();
-//  }
-//  else{
+  if(MI->getOpcode() == Vanilla::Select){
+    const TargetInstrInfo &TII = *BB->getParent()->getSubtarget().getInstrInfo();
+    DebugLoc DL = MI->getDebugLoc();
+    //DST= SELECT LHS, RHS, TargetCC, TrueV, FalseV
+    // ->
+    //thisMBB:
+    //  ...
+    //  MOV DST, FalseV
+    //  MOV R1, LHS
+    //  SLT R1, RHS
+    //  (BGTZ) trueMBB
+    //  BL  nextMBB
+    //trueMBB:
+    //  MOV DST,TrueV
+    //  BL nextMBB
+    //nextMBB:
+    //
+    const BasicBlock *LLVM_BB = BB->getBasicBlock();
+    MachineFunction::iterator I = ++BB->getIterator();
+    MachineFunction *F = BB->getParent();
+    MachineBasicBlock *trueMBB = F->CreateMachineBasicBlock(LLVM_BB);
+    MachineBasicBlock *nextMBB = F->CreateMachineBasicBlock(LLVM_BB);
+    F->insert(I, trueMBB);
+    F->insert(I, nextMBB);
+    nextMBB->splice(nextMBB->begin(), BB, std::next(MachineBasicBlock::iterator(MI)), BB->end());
+    nextMBB->transferSuccessorsAndUpdatePHIs(BB);
+    BB->addSuccessor(trueMBB);
+    BB->addSuccessor(nextMBB);
+    trueMBB->addSuccessor(nextMBB);
+    
+    unsigned DST = MI->getOperand(0).getReg();
+    unsigned LHS = MI->getOperand(1).getReg();
+    unsigned RHS = MI->getOperand(2).getReg();
+    int TargetCC = MI->getOperand(3).getImm();
+    unsigned TrueV = MI->getOperand(4).getReg();
+    unsigned FalseV = MI->getOperand(5).getReg();
+    //unsigned newR=BB->getParent()->getRegInfo().createVirtualRegister(&Vanilla::GPRRegClass);
+    unsigned newR=Vanilla::R1;
+    BuildMI(BB, DL, TII.get(Vanilla::MOV)).addReg(DST).addReg(FalseV);
+    BuildMI(BB, DL, TII.get(Vanilla::MOV)).addReg(newR).addReg(LHS);
+    BuildMI(BB, DL, TII.get(Vanilla::SLT)).addReg(newR).addReg(RHS);
+    switch (TargetCC) {
+      case ISD::SETGT:
+        llvm_unreachable("SETGT");
+        break;
+      case ISD::SETUGT:
+        llvm_unreachable("SETUGT");
+        break;
+      case ISD::SETGE:
+        llvm_unreachable("SETGE");
+        break;
+      case ISD::SETUGE:
+        llvm_unreachable("SETUGE");
+        break;
+      case ISD::SETEQ:
+        BuildMI(BB, DL, TII.get(Vanilla::BEQZ)).addReg(newR).addMBB(trueMBB);
+        BuildMI(BB, DL, TII.get(Vanilla::BL)).addMBB(nextMBB);
+        break;
+      case ISD::SETNE:
+        llvm_unreachable("SETNE");
+        break;
+      default:
+        report_fatal_error("unimplemented select CondCode " + Twine(TargetCC));
+    }
+    MachineInstr *split_point=BuildMI(BB, DL, TII.get(Vanilla::MOV)).addReg(DST).addReg(TrueV);
+    BuildMI(BB, DL, TII.get(Vanilla::BL)).addMBB(nextMBB);
+    trueMBB->splice(trueMBB->begin(), BB, MachineBasicBlock::iterator(split_point),BB->end());
+    BB=nextMBB;
+    
+    
+    F->dump();
+  }
+  else{
     llvm_unreachable("unhandled custom inserted instruction.");
-//  }
+  }
+  MI->eraseFromParent(); // The pseudo instruction is gone now.
   return BB;
 }
 
@@ -250,7 +320,6 @@ SDValue VanillaTargetLowering::LowerSELECT_CC(SDValue Op, SelectionDAG &DAG) con
   SDVTList VTs = DAG.getVTList(Op.getValueType(), MVT::Glue);
   SDValue Ops[] = {LHS, RHS, TargetCC, TrueV, FalseV};
   return DAG.getNode(VanillaISD::SELECT_CC, DL, VTs, Ops);
-  //return Op;
 }
 
 SDValue VanillaTargetLowering::LowerMUL(SDValue Op, SelectionDAG &DAG) const {
