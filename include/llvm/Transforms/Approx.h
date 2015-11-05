@@ -25,6 +25,8 @@ namespace llvm {
   //
   Pass *createOSRPass();
   
+  Pass *createDESELECTPass();
+  
 } // End llvm namespace
 
 #endif

@@ -95,6 +95,7 @@ MachineBasicBlock *
 VanillaTargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
                                                MachineBasicBlock *BB) const {
   if(MI->getOpcode() == Vanilla::Select){
+    llvm_unreachable("Lowering SELECT is not correctly setup.\n");
     const TargetInstrInfo &TII = *BB->getParent()->getSubtarget().getInstrInfo();
     DebugLoc DL = MI->getDebugLoc();
     //DST= SELECT LHS, RHS, TargetCC, TrueV, FalseV
@@ -108,6 +109,7 @@ VanillaTargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
     //  BL  nextMBB
     //trueMBB:
     //  MOV DST,TrueV
+    //  SW DST, frame#
     //  BL nextMBB
     //nextMBB:
     //
@@ -159,12 +161,10 @@ VanillaTargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
         report_fatal_error("unimplemented select CondCode " + Twine(TargetCC));
     }
     MachineInstr *split_point=BuildMI(BB, DL, TII.get(Vanilla::MOV)).addReg(DST).addReg(TrueV);
+    // SW DST to stack frame.
     BuildMI(BB, DL, TII.get(Vanilla::BL)).addMBB(nextMBB);
     trueMBB->splice(trueMBB->begin(), BB, MachineBasicBlock::iterator(split_point),BB->end());
     BB=nextMBB;
-    
-    
-    F->dump();
   }
   else{
     llvm_unreachable("unhandled custom inserted instruction.");

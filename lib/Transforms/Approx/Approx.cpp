@@ -29,6 +29,7 @@ using namespace llvm;
 /// Approx library.
 void llvm::initializeApproximation(PassRegistry &Registry) {
   initializeOSRPass(Registry);
+  initializeDESELECTPass(Registry);
 }
 
 void LLVMInitializeApproximation(LLVMPassRegistryRef R) {
