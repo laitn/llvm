@@ -1,6 +1,6 @@
 add_llvm_library(LLVMApprox
   Approx.cpp
-  DE_SELECT.cpp
+  DESELECT.cpp
   OSR.cpp
 
   ADDITIONAL_HEADER_DIRS

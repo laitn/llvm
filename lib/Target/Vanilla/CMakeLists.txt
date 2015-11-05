@@ -30,7 +30,6 @@ add_llvm_target(VanillaCodeGen
   VanillaMCInstLower.cpp
   VanillaTargetObjectFile.cpp
   VanillaVerifier.cpp
-  VanillaOperatorSR.cpp
   )
 
 add_subdirectory(TargetInfo)
