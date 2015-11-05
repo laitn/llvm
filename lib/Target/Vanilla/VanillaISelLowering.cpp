@@ -407,7 +407,7 @@ SDValue VanillaTargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
   
   unsigned NumBytes = CCInfo.getNextStackOffset();
   
-  if (Outs.size() > 2) {
+  if (Outs.size() > 4) {
     llvm_unreachable("passing too many out-going parameters.");
   }
   

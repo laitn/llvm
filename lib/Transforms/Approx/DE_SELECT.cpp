@@ -47,7 +47,18 @@ Pass *llvm::createDESELECTPass() {
 bool DESELECT::runOnFunction(Function &Fn){
   for (Function::iterator BB = Fn.begin(); BB != Fn.end(); ++BB) {
     for(BasicBlock::iterator I=BB->begin();I!=BB->end();){
+      if (strcmp(I->getOpcodeName(),"select")==0){
+        llvm_unreachable("DESELECT not implemented yet.");
+        I++;
+      }
+      else{
+        I++;
+      }
     }
+  }
+  if(OpCounter!=0){
+    errs()<<"Func name:"<<Fn.getName()<<"\t";
+    errs()<<"Number of select transformed:"<<OpCounter<<"\n";
   }
   return false;
 }

@@ -196,7 +196,9 @@ bool OSR::runOnFunction(Function &Fn){
       }
     }
   }
-  errs()<<"Func name:"<<Fn.getName()<<"\t";
-  errs()<<"Number of multiplication transformed:"<<OpCounter<<"\n";
+  if(OpCounter!=0){
+    errs()<<"Func name:"<<Fn.getName()<<"\t";
+    errs()<<"Number of mult transformed:"<<OpCounter<<"\n";
+  }
   return false;
 }
