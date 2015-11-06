@@ -300,7 +300,9 @@ SDValue VanillaTargetLowering::LowerBR_CC(SDValue Op, SelectionDAG &DAG) const {
     SUB=DAG.getNode(ISD::ADD, DL, MVT::i32, SUB, DAG.getConstant(1,DL, MVT::i32));
   }
   else if(CC==ISD::SETLE){
-    llvm_unreachable("haven't implemented SETLE yet.");
+    CC=ISD::SETLT;
+    SUB=DAG.getNode(ISD::SUB, DL, MVT::i32, SUB, DAG.getConstant(1,DL, MVT::i32));
+    //llvm_unreachable("haven't implemented SETLE yet.");
   }
   
   return DAG.getNode(VanillaISD::BR_CC, DL, Op.getValueType(), Chain, SUB,
