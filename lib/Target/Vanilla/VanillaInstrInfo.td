@@ -173,10 +173,12 @@ def NOR :REG2_1<0x07,"nor", []>;
 def SLT :REG2_1<0x08,"slt", [(set i32:$rd, (setlt i32:$rds, i32:$rs))]>;
 def SLTU:REG2_1<0x09,"sltu", []>;
 
-def LBU: LOAD<0x19, "lbu", [(set i32:$rd,  (zextloadi8 ADDRr:$rs))]>;
+//def LBU: LOAD<0x19, "lbu", [(set i32:$rd,  (zextloadi8 ADDRr:$rs))]>;
+def LBU: LOAD<0x19, "lbu", []>;
 def LW : LOAD<0x18, "lw", [(set i32:$rd,  (load ADDRr:$rs))]>;
 def LG : LOAD<0x1c, "lg", []>;
-def SB : STORE<0x1b, "sb", [(truncstorei8 i32:$rs, ADDRr:$rd)]>;
+//def SB : STORE<0x1b, "sb", [(truncstorei8 i32:$rs, ADDRr:$rd)]>;
+def SB : STORE<0x1b, "sb", []>;
 def SW : STORE<0x1a, "sw", [(store i32:$rs, ADDRr:$rd)]>;
 
 // call
@@ -212,7 +214,7 @@ def WAIT:REG2<0x0c,"wait",[]>;
 def MOVI:REG1_OFFSET11<0x1d,"movi", [(set i32:$dstReg, simm11:$offset)]>;
 def APPI:REG2_OFFSET11<0x1e,"appi", []>;
 
-//hi/li/lo
+//top2/hi/mi/lo
 def LO10 : SDNodeXForm<imm, [{
   return CurDAG->getTargetConstant((unsigned)N->getSExtValue() & 0x3ff, SDLoc(N), MVT::i32);
 }]>;
