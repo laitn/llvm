@@ -48,6 +48,15 @@ bool DESELECT::runOnFunction(Function &Fn){
   for (Function::iterator BB = Fn.begin(); BB != Fn.end(); ++BB) {
     for(BasicBlock::iterator I=BB->begin();I!=BB->end();){
       if (strcmp(I->getOpcodeName(),"select")==0){
+        I->dump();
+        // %17 = select i1 %15, i32 %16, i32 %13
+        // =>
+        // %t= alloca
+        // %f= alloca
+        // store %16, %t
+        // store %13, %t
+        // %17 = load %f
+        // %
         llvm_unreachable("DESELECT not implemented yet.");
         I++;
       }

@@ -172,6 +172,7 @@ def OR  :REG2_1<0x06,"or",  [(set i32:$rd, (or i32:$rds, i32:$rs))]>;
 def NOR :REG2_1<0x07,"nor", []>;
 def SLT :REG2_1<0x08,"slt", [(set i32:$rd, (setlt i32:$rds, i32:$rs))]>;
 def SLTU:REG2_1<0x09,"sltu", []>;
+def MULT:REG2_1<0x0b,"mult", [(set i32:$rd, (mul i32:$rds, i32:$rs))]>;
 
 //def LBU: LOAD<0x19, "lbu", [(set i32:$rd,  (zextloadi8 ADDRr:$rs))]>;
 def LBU: LOAD<0x19, "lbu", []>;
@@ -214,7 +215,7 @@ def WAIT:REG2<0x0c,"wait",[]>;
 def MOVI:REG1_OFFSET11<0x1d,"movi", [(set i32:$dstReg, simm11:$offset)]>;
 def APPI:REG2_OFFSET11<0x1e,"appi", []>;
 
-//top2/hi/mi/lo
+//hi/mi/lo
 def LO10 : SDNodeXForm<imm, [{
   return CurDAG->getTargetConstant((unsigned)N->getSExtValue() & 0x3ff, SDLoc(N), MVT::i32);
 }]>;

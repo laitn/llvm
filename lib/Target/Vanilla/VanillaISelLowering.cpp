@@ -373,7 +373,7 @@ SDValue VanillaTargetLowering::LowerMUL(SDValue Op, SelectionDAG &DAG) const {
     return RES;
   }
   else{
-    llvm_unreachable("unhandled multiplication.");
+    return Op;
   }
 }
 
