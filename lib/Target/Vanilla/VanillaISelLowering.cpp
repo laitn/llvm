@@ -228,8 +228,30 @@ LowerFormalArguments(SDValue Chain,
           InVals.push_back(ArgValue);
       }
     } else {
-      llvm_unreachable("Trying to pass too many arguments to a function.\n");
+      assert(VA.isMemLoc());
+      unsigned Offset = VA.getLocMemOffset();
+      auto PtrVT = getPointerTy(DAG.getDataLayout());
+      
+      if (VA.needsCustom()) {
+        llvm_unreachable("VA needs custom.");
+        continue;
+      }
+      int FI = MF.getFrameInfo()->CreateFixedObject(4,
+                                                    Offset,
+                                                    true);
+      SDValue FIPtr = DAG.getFrameIndex(FI, PtrVT);
+      SDValue Load ;
+      if (VA.getValVT() == MVT::i32) {
+        Load = DAG.getLoad(VA.getValVT(), DL, Chain, FIPtr,
+                           MachinePointerInfo(),
+                           false, false, false, 0);
+      } else {
+        llvm_unreachable("value not i32.");
+      }
+      InVals.push_back(Load);
+      //llvm_unreachable("Trying to pass too many arguments to a function.\n");
     }
+    
   }
   
   if (IsVarArg || MF.getFunction()->hasStructRetAttr()) {
@@ -380,6 +402,7 @@ SDValue VanillaTargetLowering::LowerMUL(SDValue Op, SelectionDAG &DAG) const {
 SDValue VanillaTargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
                                      SmallVectorImpl<SDValue> &InVals) const {
   SelectionDAG &DAG = CLI.DAG;
+  SDLoc &dl = CLI.DL;
   auto &Outs = CLI.Outs;
   auto &OutVals = CLI.OutVals;
   auto &Ins = CLI.Ins;
@@ -409,9 +432,9 @@ SDValue VanillaTargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
   
   unsigned NumBytes = CCInfo.getNextStackOffset();
   
-  if (Outs.size() > 4) {
-    llvm_unreachable("passing too many out-going parameters.");
-  }
+  //if (Outs.size() > 4) {
+  //  llvm_unreachable("passing too many out-going parameters.");
+  //}
   
   for (auto &Arg : Outs) {
     ISD::ArgFlagsTy Flags = Arg.Flags;
@@ -424,7 +447,8 @@ SDValue VanillaTargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
   Chain = DAG.getCALLSEQ_START(
                                Chain, DAG.getConstant(NumBytes, CLI.DL, PtrVT, true), CLI.DL);
   
-  SmallVector<std::pair<unsigned, SDValue>, 5> RegsToPass;
+  SmallVector<std::pair<unsigned, SDValue>, 8> RegsToPass;
+  SmallVector<SDValue, 8> MemOpChains;
   
   // Walk arg assignments
   for (unsigned i = 0, e = ArgLocs.size(); i != e; ++i) {
@@ -449,10 +473,19 @@ SDValue VanillaTargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
     }
     
     // Push arguments into RegsToPass vector
-    if (VA.isRegLoc())
+    if (VA.isRegLoc()){
       RegsToPass.push_back(std::make_pair(VA.getLocReg(), Arg));
-    else
-      llvm_unreachable("call arg pass bug");
+      continue;
+    }
+    assert(VA.isMemLoc());
+    
+    // Create a store off the stack pointer for this argument.
+    SDValue StackPtr = DAG.getRegister(Vanilla::R3, MVT::i32);
+    SDValue PtrOff = DAG.getIntPtrConstant(VA.getLocMemOffset(),dl);
+    PtrOff = DAG.getNode(ISD::ADD, dl, MVT::i32, StackPtr, PtrOff);
+    MemOpChains.push_back(DAG.getStore(Chain, dl, Arg, PtrOff,
+                                       MachinePointerInfo(),
+                                       false, false, 0));
   }
   
   SDValue InFlag;

@@ -173,6 +173,7 @@ def NOR :REG2_1<0x07,"nor", []>;
 def SLT :REG2_1<0x08,"slt", [(set i32:$rd, (setlt i32:$rds, i32:$rs))]>;
 def SLTU:REG2_1<0x09,"sltu", []>;
 def MULT:REG2_1<0x0b,"mult", [(set i32:$rd, (mul i32:$rds, i32:$rs))]>;
+def SDIV:REG2_1<0x0d,"sdiv", [(set i32:$rd, (sdiv i32:$rds, i32:$rs))]>;
 
 //def LBU: LOAD<0x19, "lbu", [(set i32:$rd,  (zextloadi8 ADDRr:$rs))]>;
 def LBU: LOAD<0x19, "lbu", []>;

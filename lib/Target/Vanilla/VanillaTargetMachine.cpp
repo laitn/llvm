@@ -64,7 +64,7 @@ TargetPassConfig *VanillaTargetMachine::createPassConfig(PassManagerBase &PM) {
 
 void VanillaPassConfig::addIRPasses(){
   //addPass(createOSRPass());
-  addPass(createDESELECTPass());
+  //addPass(createDESELECTPass());
   TargetPassConfig::addIRPasses();
 }
 
