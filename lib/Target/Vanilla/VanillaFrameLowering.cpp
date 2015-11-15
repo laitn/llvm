@@ -22,6 +22,8 @@
 
 using namespace llvm;
 
+bool VanillaFrameLowering::hasFP(const MachineFunction &MF) const {return false;}
+/*
 bool VanillaFrameLowering::hasFP(const MachineFunction &MF) const {
   const TargetRegisterInfo *RegInfo = MF.getSubtarget().getRegisterInfo();
   
@@ -31,6 +33,7 @@ bool VanillaFrameLowering::hasFP(const MachineFunction &MF) const {
   MFI->hasVarSizedObjects() ||
   MFI->isFrameAddressTaken();
 }
+ */
 
 void VanillaFrameLowering::emitPrologue(MachineFunction &MF,
                                     MachineBasicBlock &MBB) const {

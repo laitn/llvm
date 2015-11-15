@@ -230,6 +230,7 @@ LowerFormalArguments(SDValue Chain,
           InVals.push_back(ArgValue);
       }
     } else {
+      llvm_unreachable("does not handle pass parameter by memory stack [2].");
       assert(VA.isMemLoc());
       unsigned Offset = VA.getLocMemOffset()+StackOffset;
       auto PtrVT = getPointerTy(DAG.getDataLayout());
@@ -479,15 +480,18 @@ SDValue VanillaTargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
       RegsToPass.push_back(std::make_pair(VA.getLocReg(), Arg));
       continue;
     }
-    assert(VA.isMemLoc());
+    else{
+      assert(VA.isMemLoc());
+      llvm_unreachable("does not handle pass parameter by memory stack.");
     
-    // Create a store off the stack pointer for this argument.
-    SDValue StackPtr = DAG.getRegister(Vanilla::R3, MVT::i32);
-    SDValue PtrOff = DAG.getIntPtrConstant(VA.getLocMemOffset(),dl);
-    PtrOff = DAG.getNode(ISD::ADD, dl, MVT::i32, StackPtr, PtrOff);
-    MemOpChains.push_back(DAG.getStore(Chain, dl, Arg, PtrOff,
+      // Create a store off the stack pointer for this argument.
+      SDValue StackPtr = DAG.getRegister(Vanilla::R0, MVT::i32);
+      SDValue PtrOff = DAG.getIntPtrConstant(VA.getLocMemOffset(),dl);
+      PtrOff = DAG.getNode(ISD::ADD, dl, MVT::i32, StackPtr, PtrOff);
+      MemOpChains.push_back(DAG.getStore(Chain, dl, Arg, PtrOff,
                                        MachinePointerInfo(),
                                        false, false, 0));
+    }
   }
   
   // Emit all stores, make sure the occur before any copies into physregs.
