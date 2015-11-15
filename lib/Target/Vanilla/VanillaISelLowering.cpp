@@ -488,6 +488,10 @@ SDValue VanillaTargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
                                        false, false, 0));
   }
   
+  // Emit all stores, make sure the occur before any copies into physregs.
+  if (!MemOpChains.empty())
+    Chain = DAG.getNode(ISD::TokenFactor, dl, MVT::Other, MemOpChains);
+  
   SDValue InFlag;
   
   // Build a sequence of copy-to-reg nodes chained together with token chain and
