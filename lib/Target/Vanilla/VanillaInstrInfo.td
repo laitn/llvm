@@ -184,7 +184,7 @@ def SB : STORE<0x1b, "sb", []>;
 def SW : STORE<0x1a, "sw", [(store i32:$rs, ADDRr:$rd)]>;
 
 // call
-let isCall=1, hasDelaySlot=0, Uses = [R3], Defs = [R2, R5, R6, R7, R8] in {
+let isCall=1, hasDelaySlot=0, Uses = [R0, R3], Defs = [R2, R5, R6, R7, R8] in {
   def CALL: Pseudo<(outs),(ins calltarget:$BrDst),"_call",[]>;
 }
 def : Pat<(Vanillacall tglobaladdr:$dst), (CALL tglobaladdr:$dst)>;

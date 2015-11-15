@@ -197,6 +197,8 @@ LowerFormalArguments(SDValue Chain,
   CCState CCInfo(CallConv, IsVarArg, MF, ArgLocs, *DAG.getContext());
   CCInfo.AnalyzeFormalArguments(Ins, CC_Vanilla);
   
+  const unsigned StackOffset = 0;
+  
   for (auto &VA : ArgLocs) {
     if (VA.isRegLoc()) {
       // Arguments passed in registers
@@ -229,7 +231,7 @@ LowerFormalArguments(SDValue Chain,
       }
     } else {
       assert(VA.isMemLoc());
-      unsigned Offset = VA.getLocMemOffset();
+      unsigned Offset = VA.getLocMemOffset()+StackOffset;
       auto PtrVT = getPointerTy(DAG.getDataLayout());
       
       if (VA.needsCustom()) {

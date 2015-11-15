@@ -22,7 +22,15 @@
 
 using namespace llvm;
 
-bool VanillaFrameLowering::hasFP(const MachineFunction &MF) const { return false; }
+bool VanillaFrameLowering::hasFP(const MachineFunction &MF) const {
+  const TargetRegisterInfo *RegInfo = MF.getSubtarget().getRegisterInfo();
+  
+  const MachineFrameInfo *MFI = MF.getFrameInfo();
+  return MF.getTarget().Options.DisableFramePointerElim(MF) ||
+  RegInfo->needsStackRealignment(MF) ||
+  MFI->hasVarSizedObjects() ||
+  MFI->isFrameAddressTaken();
+}
 
 void VanillaFrameLowering::emitPrologue(MachineFunction &MF,
                                     MachineBasicBlock &MBB) const {
@@ -46,6 +54,9 @@ void VanillaFrameLowering::emitPrologue(MachineFunction &MF,
     else{
       llvm_unreachable("large stack size is not handled.");
     }
+  }
+  if(hasFP(MF)){
+    BuildMI(MBB, MBBI, dl, TII.get(Vanilla::MOV), Vanilla::R0).addReg(Vanilla::R3);
   }
 }
 
@@ -71,6 +82,9 @@ void VanillaFrameLowering::emitEpilogue(MachineFunction &MF,
     else{
       llvm_unreachable("large stack size is not handled.");
     }
+  }
+  if(hasFP(MF)){
+    BuildMI(MBB, MBBI, dl, TII.get(Vanilla::MOV), Vanilla::R0).addReg(Vanilla::R3);
   }
 }
 
