@@ -22,8 +22,8 @@
 
 using namespace llvm;
 
-bool VanillaFrameLowering::hasFP(const MachineFunction &MF) const {return false;}
-/*
+//bool VanillaFrameLowering::hasFP(const MachineFunction &MF) const {return false;}
+
 bool VanillaFrameLowering::hasFP(const MachineFunction &MF) const {
   const TargetRegisterInfo *RegInfo = MF.getSubtarget().getRegisterInfo();
   
@@ -33,7 +33,6 @@ bool VanillaFrameLowering::hasFP(const MachineFunction &MF) const {
   MFI->hasVarSizedObjects() ||
   MFI->isFrameAddressTaken();
 }
- */
 
 void VanillaFrameLowering::emitPrologue(MachineFunction &MF,
                                     MachineBasicBlock &MBB) const {
@@ -41,7 +40,10 @@ void VanillaFrameLowering::emitPrologue(MachineFunction &MF,
   DebugLoc dl = MBBI != MBB.end() ? MBBI->getDebugLoc() : DebugLoc();
   MachineFrameInfo *MFI = MF.getFrameInfo();
   const VanillaInstrInfo &TII = *static_cast<const VanillaInstrInfo *>(MF.getSubtarget().getInstrInfo());
-  
+
+  if(hasFP(MF)){
+    BuildMI(MBB, MBBI, dl, TII.get(Vanilla::MOV), Vanilla::R0).addReg(Vanilla::R3);
+  }
   // Get the number of bytes to allocate from the FrameInfo
   int NumBytes = (int) MFI->getStackSize();
   if(NumBytes!=0){

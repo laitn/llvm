@@ -65,15 +65,17 @@ void VanillaRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
     assert(i < MI.getNumOperands() && "Instr doesn't have FrameIndex operand!");
   }
   
-  unsigned baseReg = MF.getSubtarget().getFrameLowering()->hasFP(MF)?getFrameRegister(MF):Vanilla::R3;
   int FrameIndex = MI.getOperand(i).getIndex();
+  unsigned baseReg;
+  if(FrameIndex<0){
+    baseReg=Vanilla::R0;
+  }
+  else{
+    baseReg=Vanilla::R3;
+  }
   
   int Offset = MF.getFrameInfo()->getObjectOffset(FrameIndex);
-  
-  //MI.dump();
-  //errs()<<"FrameIndex:"<<FrameIndex<<"\n";
-  //errs()<<"Offset:"<<Offset<<"\n";
-  
+
   if(isInt<11>(Offset)){
     //MOVI R1, Offset
     //ADD  R1, R1, baseReg
