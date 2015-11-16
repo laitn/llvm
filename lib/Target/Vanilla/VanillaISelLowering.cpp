@@ -230,7 +230,7 @@ LowerFormalArguments(SDValue Chain,
           InVals.push_back(ArgValue);
       }
     } else {
-      llvm_unreachable("does not handle pass parameter by memory stack [2].");
+      //llvm_unreachable("does not handle pass parameter by memory stack [2].");
       assert(VA.isMemLoc());
       unsigned Offset = VA.getLocMemOffset()+StackOffset;
       auto PtrVT = getPointerTy(DAG.getDataLayout());
@@ -482,7 +482,7 @@ SDValue VanillaTargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
     }
     else{
       assert(VA.isMemLoc());
-      llvm_unreachable("does not handle pass parameter by memory stack.");
+      //llvm_unreachable("does not handle pass parameter by memory stack.");
     
       // Create a store off the stack pointer for this argument.
       SDValue StackPtr = DAG.getRegister(Vanilla::R0, MVT::i32);

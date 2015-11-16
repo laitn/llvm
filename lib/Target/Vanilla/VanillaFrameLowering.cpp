@@ -58,9 +58,6 @@ void VanillaFrameLowering::emitPrologue(MachineFunction &MF,
       llvm_unreachable("large stack size is not handled.");
     }
   }
-  if(hasFP(MF)){
-    BuildMI(MBB, MBBI, dl, TII.get(Vanilla::MOV), Vanilla::R0).addReg(Vanilla::R3);
-  }
 }
 
 void VanillaFrameLowering::emitEpilogue(MachineFunction &MF,
@@ -85,9 +82,6 @@ void VanillaFrameLowering::emitEpilogue(MachineFunction &MF,
     else{
       llvm_unreachable("large stack size is not handled.");
     }
-  }
-  if(hasFP(MF)){
-    BuildMI(MBB, MBBI, dl, TII.get(Vanilla::MOV), Vanilla::R0).addReg(Vanilla::R3);
   }
 }
 

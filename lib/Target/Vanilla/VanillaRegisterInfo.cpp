@@ -70,6 +70,10 @@ void VanillaRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   
   int Offset = MF.getFrameInfo()->getObjectOffset(FrameIndex);
   
+  //MI.dump();
+  //errs()<<"FrameIndex:"<<FrameIndex<<"\n";
+  //errs()<<"Offset:"<<Offset<<"\n";
+  
   if(isInt<11>(Offset)){
     //MOVI R1, Offset
     //ADD  R1, R1, baseReg
