@@ -169,7 +169,7 @@ def SRAV:REG2_1<0x03,"srav", [(set i32:$rd, (sra i32:$rds, i32:$rs))]>;
 def SRLV:REG2_1<0x04,"srlv", [(set i32:$rd, (srl i32:$rds, i32:$rs))]>;
 def AND :REG2_1<0x05,"and", [(set i32:$rd, (and i32:$rds, i32:$rs))]>;
 def OR  :REG2_1<0x06,"or",  [(set i32:$rd, (or i32:$rds, i32:$rs))]>;
-def NOR :REG2_1<0x07,"nor", []>;
+def XOR :REG2_1<0x07,"nor", [(set i32:$rd, (xor i32:$rds, i32:$rs))]>;
 def SLT :REG2_1<0x08,"slt", [(set i32:$rd, (setlt i32:$rds, i32:$rs))]>;
 def SLTU:REG2_1<0x09,"sltu", []>;
 def MULT:REG2_1<0x0b,"mult", [(set i32:$rd, (mul i32:$rds, i32:$rs))]>;
