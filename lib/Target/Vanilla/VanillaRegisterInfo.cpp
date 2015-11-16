@@ -75,6 +75,11 @@ void VanillaRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   }
   
   int Offset = MF.getFrameInfo()->getObjectOffset(FrameIndex);
+  //errs()<<"Func:"<<MI.getParent()->getParent()->getName()<<"\tBB:"<<MI.getParent()->getName()<<"\tFrameIndex:"<<FrameIndex<<"\tOffset:"<<Offset<<"\tbaseReg:"<<baseReg<<"\t";MI.dump();
+  if(Offset==0){
+    MI.getOperand(i).ChangeToRegister(baseReg, false);
+    return;
+  }
 
   if(isInt<11>(Offset)){
     //MOVI R1, Offset
@@ -94,7 +99,6 @@ void VanillaRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   }
   
   MI.getOperand(i).ChangeToRegister(Vanilla::R1, false);
-  
 }
 
 unsigned VanillaRegisterInfo::getFrameRegister(const MachineFunction &MF) const {

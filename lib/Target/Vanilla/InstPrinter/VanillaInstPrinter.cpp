@@ -69,13 +69,18 @@ void VanillaInstPrinter::printOperand(const MCInst *MI, unsigned OpNo,
 
 void VanillaInstPrinter::printMemOperand(const MCInst *MI, unsigned OpNo, raw_ostream &O,
                                      const char *Modifier) {
-  if(MI->getNumOperands()<=2){
-    // for disassembler.
-    return;
-  }
   const MCOperand &RegOp = MI->getOperand(OpNo);
   // register
-  assert(RegOp.isReg() && "Register operand not a register");
-  O << getRegisterName(RegOp.getReg());
+  if(RegOp.isReg()){
+    //for assembler.
+    O << getRegisterName(RegOp.getReg());
+  }
+  else if(RegOp.isImm()){
+    //for disassembler.
+    O << getRegisterName(RegOp.getImm()+1);
+  }
+  else{
+    llvm_unreachable("unhandled mem operand type.");
+  }
 }
 
