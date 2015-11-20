@@ -95,76 +95,71 @@ MachineBasicBlock *
 VanillaTargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
                                                MachineBasicBlock *BB) const {
   if(MI->getOpcode() == Vanilla::Select){
-    llvm_unreachable("Lowering SELECT is not correctly setup.\n");
+    //BB->getParent()->dump();
+    //llvm_unreachable("Lowering SELECT is not correctly setup.\n");
     const TargetInstrInfo &TII = *BB->getParent()->getSubtarget().getInstrInfo();
     DebugLoc DL = MI->getDebugLoc();
-    //DST= SELECT LHS, RHS, TargetCC, TrueV, FalseV
+    MachineRegisterInfo &RegInfo = BB->getParent()->getRegInfo();
+
+    //DST= SELECT LHS, RHS, CC, TrueV, FalseV
     // ->
-    //thisMBB:
-    //  ...
-    //  MOV DST, FalseV
-    //  MOV R1, LHS
-    //  SUB R1, RHS
-    //  BEQZ trueMBB
-    //  BL  nextMBB
-    //trueMBB:
-    //  MOV DST,TrueV
-    //  SW DST, frame#
-    //  BL nextMBB
-    //nextMBB:
-    //
+    
     const BasicBlock *LLVM_BB = BB->getBasicBlock();
     MachineFunction::iterator I = ++BB->getIterator();
-    MachineFunction *F = BB->getParent();
-    MachineBasicBlock *trueMBB = F->CreateMachineBasicBlock(LLVM_BB);
-    MachineBasicBlock *nextMBB = F->CreateMachineBasicBlock(LLVM_BB);
-    F->insert(I, trueMBB);
-    F->insert(I, nextMBB);
-    nextMBB->splice(nextMBB->begin(), BB, std::next(MachineBasicBlock::iterator(MI)), BB->end());
-    nextMBB->transferSuccessorsAndUpdatePHIs(BB);
-    BB->addSuccessor(trueMBB);
-    BB->addSuccessor(nextMBB);
-    trueMBB->addSuccessor(nextMBB);
+    //ThisMBB:
+    //  ...
+    //  SUB LHS, RHS
+    //  BEQZ LHS, trueMBB
+    //  BL  nextMBB
+    MachineBasicBlock *ThisMBB=BB;
+    MachineFunction *F=BB->getParent();
+    MachineBasicBlock *Copy0MBB=F->CreateMachineBasicBlock(LLVM_BB);
+    MachineBasicBlock *Copy1MBB=F->CreateMachineBasicBlock(LLVM_BB);
     
-    unsigned DST = MI->getOperand(0).getReg();
-    unsigned LHS = MI->getOperand(1).getReg();
-    unsigned RHS = MI->getOperand(2).getReg();
-    int TargetCC = MI->getOperand(3).getImm();
-    unsigned TrueV = MI->getOperand(4).getReg();
-    unsigned FalseV = MI->getOperand(5).getReg();
-    //unsigned newR=Vanilla::R1;
-    unsigned newR=F->getRegInfo().createVirtualRegister(&Vanilla::GPRRegClass);
-    BuildMI(BB, DL, TII.get(Vanilla::MOV)).addReg(DST).addReg(FalseV);
-    BuildMI(BB, DL, TII.get(Vanilla::MOV)).addReg(newR).addReg(LHS);
-    BuildMI(BB, DL, TII.get(Vanilla::SUBU)).addReg(newR).addReg(newR).addReg(RHS);
-    switch (TargetCC) {
+    F->insert(I, Copy0MBB);
+    F->insert(I, Copy1MBB);
+    
+    Copy1MBB->splice(Copy1MBB->begin(), BB,std::next(MachineBasicBlock::iterator(MI)),BB->end());
+    Copy1MBB->transferSuccessorsAndUpdatePHIs(BB);
+    BB->addSuccessor(Copy0MBB);
+    BB->addSuccessor(Copy1MBB);
+    
+    unsigned LHS=MI->getOperand(1).getReg();
+    unsigned RHS=MI->getOperand(2).getReg();
+    unsigned VR1 = RegInfo.createVirtualRegister(&Vanilla::GPRRegClass);
+    BuildMI(BB, DL, TII.get(Vanilla::SUBU)).addReg(LHS).addReg(LHS).addReg(RHS);
+    
+    int CC=MI->getOperand(3).getImm();
+    switch(CC){
       case ISD::SETGT:
-        llvm_unreachable("SETGT");
-        break;
       case ISD::SETUGT:
-        llvm_unreachable("SETUGT");
+        BuildMI(BB, DL, TII.get(Vanilla::BGTZ)).addReg(LHS).addMBB(Copy1MBB);
         break;
       case ISD::SETGE:
-        llvm_unreachable("SETGE");
-        break;
       case ISD::SETUGE:
-        llvm_unreachable("SETUGE");
+        BuildMI(BB, DL, TII.get(Vanilla::MOVI)).addReg(VR1).addImm(1);
+        BuildMI(BB, DL, TII.get(Vanilla::ADDU)).addReg(LHS).addReg(LHS).addReg(VR1);
+        BuildMI(BB, DL, TII.get(Vanilla::BGTZ)).addReg(LHS).addMBB(Copy1MBB);
         break;
       case ISD::SETEQ:
-        BuildMI(BB, DL, TII.get(Vanilla::BEQZ)).addReg(newR).addMBB(trueMBB);
-        BuildMI(BB, DL, TII.get(Vanilla::BL)).addMBB(nextMBB);
+        BuildMI(BB, DL, TII.get(Vanilla::BEQZ)).addReg(LHS).addMBB(Copy1MBB);
         break;
       case ISD::SETNE:
-        llvm_unreachable("SETNE");
+        BuildMI(BB, DL, TII.get(Vanilla::BNEQZ)).addReg(LHS).addMBB(Copy1MBB);
         break;
       default:
-        report_fatal_error("unimplemented select CondCode " + Twine(TargetCC));
+        report_fatal_error("unimplemented select CondCode " + Twine(CC));
     }
-    MachineInstr *split_point=BuildMI(BB, DL, TII.get(Vanilla::MOV)).addReg(DST).addReg(TrueV);
-    // SW DST to stack frame.
-    BuildMI(BB, DL, TII.get(Vanilla::BL)).addMBB(nextMBB);
-    trueMBB->splice(trueMBB->begin(), BB, MachineBasicBlock::iterator(split_point),BB->end());
-    BB=nextMBB;
+    BB=Copy0MBB;
+    BB->addSuccessor(Copy1MBB);
+    BB = Copy1MBB;
+    BuildMI(*BB, BB->begin(), DL, TII.get(Vanilla::PHI), MI->getOperand(0).getReg())
+    .addReg(MI->getOperand(5).getReg())
+    .addMBB(Copy0MBB)
+    .addReg(MI->getOperand(4).getReg())
+    .addMBB(ThisMBB);
+    //errs()<<"==================================\n";
+    //BB->getParent()->dump();
   }
   else{
     llvm_unreachable("unhandled custom inserted instruction.");
