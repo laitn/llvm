@@ -94,6 +94,7 @@ bool VanillaVerifier::runOnMachineBasicBlock1(MachineBasicBlock &MBB) {
           // mov r1, rds
           // r1 =r1, rs
           // mov rd, r1
+          I->dump();
           BuildMI(MBB, I, I->getDebugLoc(), TII->get(Vanilla::MOV), Vanilla::R1).addReg(MI->getOperand(1).getReg());
           I++;
           assert(
