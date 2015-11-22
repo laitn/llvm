@@ -3132,6 +3132,9 @@ LSRInstance::CollectLoopInvariantFixupsAndFormulae() {
             PHINode::getIncomingValueNumForOperand(U.getOperandNo()));
         if (!DT.dominates(L->getHeader(), UseBB))
           continue;
+        // Don't bother if the instruction is in a BB which ends in an EHPad.
+        if (UseBB->getTerminator()->isEHPad())
+          continue;
         // Ignore uses which are part of other SCEV expressions, to avoid
         // analyzing them multiple times.
         if (SE.isSCEVable(UserInst->getType())) {
@@ -4432,7 +4435,7 @@ LSRInstance::AdjustInsertPositionForExpand(BasicBlock::iterator LowestIP,
   while (isa<PHINode>(IP)) ++IP;
 
   // Ignore landingpad instructions.
-  while (IP->isEHPad()) ++IP;
+  while (!isa<TerminatorInst>(IP) && IP->isEHPad()) ++IP;
 
   // Ignore debug intrinsics.
   while (isa<DbgInfoIntrinsic>(IP)) ++IP;

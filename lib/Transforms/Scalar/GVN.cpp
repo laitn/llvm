@@ -129,6 +129,7 @@ namespace {
     uint32_t lookup(Value *V) const;
     uint32_t lookup_or_add_cmp(unsigned Opcode, CmpInst::Predicate Pred,
                                Value *LHS, Value *RHS);
+    bool exists(Value *V) const;
     void add(Value *V, uint32_t num);
     void clear();
     void erase(Value *v);
@@ -388,6 +389,9 @@ uint32_t ValueTable::lookup_or_add_call(CallInst *C) {
     return nextValueNumber++;
   }
 }
+
+/// Returns true if a value number exists for the specified value.
+bool ValueTable::exists(Value *V) const { return valueNumbering.count(V) != 0; }
 
 /// lookup_or_add - Returns the value number for the specified value, assigning
 /// it a new number if it did not have one before.
@@ -1669,6 +1673,8 @@ bool GVN::PerformLoadPRE(LoadInst *LI, AvailValInBlkVect &ValuesPerBlock,
     if (Tags)
       NewLoad->setAAMetadata(Tags);
 
+    if (auto *MD = LI->getMetadata(LLVMContext::MD_invariant_load))
+      NewLoad->setMetadata(LLVMContext::MD_invariant_load, MD);
     if (auto *InvGroupMD = LI->getMetadata(LLVMContext::MD_invariant_group))
       NewLoad->setMetadata(LLVMContext::MD_invariant_group, InvGroupMD);
 
@@ -1699,6 +1705,10 @@ bool GVN::PerformLoadPRE(LoadInst *LI, AvailValInBlkVect &ValuesPerBlock,
 /// Attempt to eliminate a load whose dependencies are
 /// non-local by performing PHI construction.
 bool GVN::processNonLocalLoad(LoadInst *LI) {
+  // non-local speculations are not allowed under asan.
+  if (LI->getParent()->getParent()->hasFnAttribute(Attribute::SanitizeAddress))
+    return false;
+
   // Step 1: Find the non-local dependencies of the load.
   LoadDepVect Deps;
   MD->getNonLocalPointerDependency(LI, Deps);
@@ -2387,17 +2397,21 @@ bool GVN::processInstruction(Instruction *I) {
 
   // Perform fast-path value-number based elimination of values inherited from
   // dominators.
-  Value *repl = findLeader(I->getParent(), Num);
-  if (!repl) {
+  Value *Repl = findLeader(I->getParent(), Num);
+  if (!Repl) {
     // Failure, just remember this instance for future use.
     addToLeaderTable(Num, I, I->getParent());
+    return false;
+  } else if (Repl == I) {
+    // If I was the result of a shortcut PRE, it might already be in the table
+    // and the best replacement for itself. Nothing to do.
     return false;
   }
 
   // Remove it!
-  patchAndReplaceAllUsesWith(I, repl);
-  if (MD && repl->getType()->getScalarType()->isPointerTy())
-    MD->invalidateCachedPointerInfo(repl);
+  patchAndReplaceAllUsesWith(I, Repl);
+  if (MD && Repl->getType()->getScalarType()->isPointerTy())
+    MD->invalidateCachedPointerInfo(Repl);
   markInstructionForDeletion(I);
   return true;
 }
@@ -2524,7 +2538,14 @@ bool GVN::performScalarPREInsertion(Instruction *Instr, BasicBlock *Pred,
     Value *Op = Instr->getOperand(i);
     if (isa<Argument>(Op) || isa<Constant>(Op) || isa<GlobalValue>(Op))
       continue;
-
+    // This could be a newly inserted instruction, in which case, we won't
+    // find a value number, and should give up before we hurt ourselves.
+    // FIXME: Rewrite the infrastructure to let it easier to value number
+    // and process newly inserted instructions.
+    if (!VN.exists(Op)) {
+      success = false;
+      break;
+    }
     if (Value *V = findLeader(Pred, VN.lookup(Op))) {
       Instr->setOperand(i, V);
     } else {
@@ -2699,7 +2720,7 @@ bool GVN::performPRE(Function &F) {
                               BE = CurrentBlock->end();
          BI != BE;) {
       Instruction *CurInst = &*BI++;
-      Changed = performScalarPRE(CurInst);
+      Changed |= performScalarPRE(CurInst);
     }
   }
 

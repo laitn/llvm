@@ -186,7 +186,7 @@ INITIALIZE_PASS_END(HexagonPacketizer, "packets", "Hexagon Packetizer",
 HexagonPacketizerList::HexagonPacketizerList(
     MachineFunction &MF, MachineLoopInfo &MLI,
     const MachineBranchProbabilityInfo *MBPI)
-    : VLIWPacketizerList(MF, MLI, true) {
+    : VLIWPacketizerList(MF, MLI) {
   this->MBPI = MBPI;
 }
 
@@ -1323,7 +1323,7 @@ bool HexagonPacketizerList::isLegalToPruneDependencies(SUnit *SUI, SUnit *SUJ) {
 
     // Check if the instruction (must be a store) was glued with an Allocframe
     // instruction. If so, restore its offset to its original value, i.e. use
-    // curent SP instead of caller's SP.
+    // current SP instead of caller's SP.
     if (GlueAllocframeStore) {
       I->getOperand(1).setImm(I->getOperand(1).getImm() +
                                              FrameSize + HEXAGON_LRFP_SIZE);
