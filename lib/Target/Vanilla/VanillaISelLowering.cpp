@@ -127,25 +127,27 @@ VanillaTargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
     unsigned LHS=MI->getOperand(1).getReg();
     unsigned RHS=MI->getOperand(2).getReg();
     unsigned VR1 = RegInfo.createVirtualRegister(&Vanilla::GPRRegClass);
-    BuildMI(BB, DL, TII.get(Vanilla::SUBU)).addReg(LHS).addReg(LHS).addReg(RHS);
+    unsigned LHS_ = RegInfo.createVirtualRegister(&Vanilla::GPRRegClass);
+    unsigned LHS__ = RegInfo.createVirtualRegister(&Vanilla::GPRRegClass);
+    BuildMI(BB, DL, TII.get(Vanilla::SUBU), LHS_).addReg(LHS).addReg(RHS);
     
     int CC=MI->getOperand(3).getImm();
     switch(CC){
       case ISD::SETGT:
       case ISD::SETUGT:
-        BuildMI(BB, DL, TII.get(Vanilla::BGTZ)).addReg(LHS).addMBB(Copy1MBB);
+        BuildMI(BB, DL, TII.get(Vanilla::BGTZ)).addReg(LHS_).addMBB(Copy1MBB);
         break;
       case ISD::SETGE:
       case ISD::SETUGE:
-        BuildMI(BB, DL, TII.get(Vanilla::MOVI)).addReg(VR1).addImm(1);
-        BuildMI(BB, DL, TII.get(Vanilla::ADDU)).addReg(LHS).addReg(LHS).addReg(VR1);
-        BuildMI(BB, DL, TII.get(Vanilla::BGTZ)).addReg(LHS).addMBB(Copy1MBB);
+        BuildMI(BB, DL, TII.get(Vanilla::MOVI), VR1).addImm(1);
+        BuildMI(BB, DL, TII.get(Vanilla::ADDU),LHS__).addReg(LHS_).addReg(VR1);
+        BuildMI(BB, DL, TII.get(Vanilla::BGTZ)).addReg(LHS__).addMBB(Copy1MBB);
         break;
       case ISD::SETEQ:
-        BuildMI(BB, DL, TII.get(Vanilla::BEQZ)).addReg(LHS).addMBB(Copy1MBB);
+        BuildMI(BB, DL, TII.get(Vanilla::BEQZ)).addReg(LHS_).addMBB(Copy1MBB);
         break;
       case ISD::SETNE:
-        BuildMI(BB, DL, TII.get(Vanilla::BNEQZ)).addReg(LHS).addMBB(Copy1MBB);
+        BuildMI(BB, DL, TII.get(Vanilla::BNEQZ)).addReg(LHS_).addMBB(Copy1MBB);
         break;
       default:
         report_fatal_error("unimplemented select CondCode " + Twine(CC));
