@@ -156,7 +156,12 @@ bool VanillaVerifier::runOnMachineBasicBlock0(MachineBasicBlock &MBB) {
     if (MI->getOpcode()==Vanilla::MOVI && MI->getOperand(0).getReg()!=Vanilla::R1){
       // re-allocate register using reserved R1.
       I++;
-      BuildMI(MBB, I, I->getDebugLoc(), TII->get(Vanilla::MOV), MI->getOperand(0).getReg()).addReg(Vanilla::R1);
+      if(I!=MBB.end()){
+        BuildMI(MBB, I, I->getDebugLoc(), TII->get(Vanilla::MOV), MI->getOperand(0).getReg()).addReg(Vanilla::R1);
+      }
+      else{
+        BuildMI(&MBB, MI->getDebugLoc(), TII->get(Vanilla::MOV), MI->getOperand(0).getReg()).addReg(Vanilla::R1);
+      }
       MI->getOperand(0).setReg(Vanilla::R1);
       transform++;
       Changed=true;
