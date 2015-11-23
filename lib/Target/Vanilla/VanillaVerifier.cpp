@@ -94,7 +94,7 @@ bool VanillaVerifier::runOnMachineBasicBlock1(MachineBasicBlock &MBB) {
           // mov r1, rds
           // r1 =r1, rs
           // mov rd, r1
-          I->dump();
+          assert(I!=MBB.end() && "insert point is end().0");
           BuildMI(MBB, I, I->getDebugLoc(), TII->get(Vanilla::MOV), Vanilla::R1).addReg(MI->getOperand(1).getReg());
           I++;
           assert(
@@ -102,7 +102,12 @@ bool VanillaVerifier::runOnMachineBasicBlock1(MachineBasicBlock &MBB) {
                   && MI->getOperand(1).getReg()!=Vanilla::R1
                   && MI->getOperand(2).getReg()!=Vanilla::R1)
                  && "R1 is already used.");
-          BuildMI(MBB, I, I->getDebugLoc(), TII->get(Vanilla::MOV), MI->getOperand(0).getReg()).addReg(Vanilla::R1);
+          if(I!=MBB.end()){
+            BuildMI(MBB, I, I->getDebugLoc(), TII->get(Vanilla::MOV), MI->getOperand(0).getReg()).addReg(Vanilla::R1);
+          }
+          else{
+            BuildMI(&MBB, MI->getDebugLoc(), TII->get(Vanilla::MOV), MI->getOperand(0).getReg()).addReg(Vanilla::R1);
+          }
           MI->getOperand(0).setReg(Vanilla::R1);
           MI->getOperand(1).setReg(Vanilla::R1);
           transform++;
