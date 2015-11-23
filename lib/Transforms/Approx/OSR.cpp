@@ -124,7 +124,7 @@ bool OSR::runOnFunction(Function &Fn){
         //
         //
         // allocate stack slot in the beginning of the function
-        BasicBlock *first_block=Fn.begin();
+        BasicBlock *first_block=&(*Fn.begin());
         IRBuilder<> Builder_first(first_block,first_block->begin());
         Value *res_alloc=Builder_first.CreateAlloca(I->getType());
         Value *counter_alloc=Builder_first.CreateAlloca(Type::getInt32Ty(getGlobalContext()));
@@ -174,20 +174,17 @@ bool OSR::runOnFunction(Function &Fn){
         br_mul_inc->setOperand(0, mul_cond);
         BasicBlock::iterator br_mul_cond=mul_cond->end();
         br_mul_cond--;
-        //br_mul_cond->dump();
         br_mul_cond->eraseFromParent();
         IRBuilder<> Builder4(mul_cond);
         Builder4.CreateCondBr(while_cond, mul_body,next);
         
         // remove multiplication
-        replaceAllUsesWith_stackload(I, res_alloc);
+        replaceAllUsesWith_stackload(&(*I), res_alloc);
         
-        //BasicBlock::iterator to_remove=I;
         I++;
-        BB=mul_inc;
-        //to_remove->eraseFromParent();
+        llvm_unreachable("implement BB=mul_inc in a reasonable way before going forward.");
+        //BB=mul_inc;
         
-        //Fn.dump();
         mul_count++;
         OpCounter++;
       }

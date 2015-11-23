@@ -13,6 +13,7 @@
 #include "llvm/MC/MCInst.h"
 #include "llvm/MC/MCObjectFileInfo.h"
 #include "llvm/MC/MCParser/MCParsedAsmOperand.h"
+#include "llvm/MC/MCRegisterInfo.h"
 #include "llvm/MC/MCStreamer.h"
 #include "llvm/MC/MCSubtargetInfo.h"
 #include "llvm/MC/MCSymbol.h"
@@ -25,7 +26,7 @@ namespace {
   class VanillaOperand;
   class VanillaAsmParser : public MCTargetAsmParser {
 
-    MCSubtargetInfo &STI;
+    //MCSubtargetInfo &STI;
     MCAsmParser &Parser;
 
   /// @name Auto-generated Match Functions
@@ -37,12 +38,12 @@ namespace {
   /// }
 
   public:
-    VanillaAsmParser(MCSubtargetInfo &sti, MCAsmParser &parser,
+    VanillaAsmParser(const MCSubtargetInfo &sti, MCAsmParser &parser,
                 const MCInstrInfo &MII,
                 const MCTargetOptions &Options)
-      : MCTargetAsmParser(Options), STI(sti), Parser(parser) {
+      : MCTargetAsmParser(Options, sti), Parser(parser) {
       // Initialize the set of available features.
-      //setAvailableFeatures(ComputeAvailableFeatures(STI.getFeatureBits()));
+      setAvailableFeatures(ComputeAvailableFeatures(getSTI().getFeatureBits()));
     }
     // public interface of the MCTargetAsmParser.
     bool MatchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
