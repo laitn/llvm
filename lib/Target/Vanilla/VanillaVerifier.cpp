@@ -51,8 +51,9 @@ namespace {
       bool Changed = false;
       Subtarget = &F.getSubtarget<VanillaSubtarget>();
       for (MachineFunction::iterator FI = F.begin(), FE = F.end();
-           FI != FE; ++FI)
-        Changed |= runOnMachineBasicBlock_regalloc(*FI);
+           FI != FE; ++FI){
+        //Changed |= runOnMachineBasicBlock_regalloc(*FI);
+      }
       // 2nd pass -- add program terminator to signal hardware.
       if(F.getName().compare("main")==0){
         for (MachineFunction::iterator FI = F.begin(), FE = F.end();

@@ -117,24 +117,23 @@ class REG2_1<bits<5> Op, string OpcodeStr, list<dag> Pattern>
 : InstVanilla<(outs GPR:$rd), (ins GPR:$rds, GPR:$rs), !strconcat(OpcodeStr, "\t$rd, $rds, $rs"), Pattern> {
   bits<5> rd;
   bits<6> rs;
-  bits<5> rds;
   
   let Opcode=Op;
   let Inst{10-6}=rd;
   let Inst{5-0}=rs;
   
-  let TwoOperandAliasConstraint="$rd=$rds";
+  let Constraints = "$rds = $rd";
+  let DisableEncoding="$rds";
 }
 
 class REG1_BRANCH11<bits<5> Op, string OpcodeStr, PatLeaf Cond>
 : InstVanilla<(outs), (ins GPR:$rd, brtarget:$BrDst),
               !strconcat(OpcodeStr, "\t$rd, 0, goto $BrDst"), [(Vanillabrcc i32:$rd, Cond, bb:$BrDst)]> {
-  //bits<5> rd;
   bits<11> BrDst;
   
   let Opcode=Op;
-  //let Inst{10-6}=rd;
   let Inst{10-0}=BrDst;
+  let DisableEncoding="$rd";
 }
 
 class BRANCH11<bits<5> Op, string OpcodeStr, list<dag> Pattern>
@@ -151,6 +150,7 @@ class REG1_OFFSET11<bits<5> Op, string OpcodeStr, list<dag> Pattern>
   
   let Opcode=Op;
   let Inst{10-0}=offset;
+  let DisableEncoding="$dstReg";
 }
 
 class REG2_OFFSET11<bits<5> Op, string OpcodeStr, list<dag> Pattern>
@@ -159,6 +159,9 @@ class REG2_OFFSET11<bits<5> Op, string OpcodeStr, list<dag> Pattern>
   
   let Opcode=Op;
   let Inst{10-0}=offset;
+  
+  let Constraints = "$srcReg = $dstReg";
+  let DisableEncoding="$dstReg, $srcReg";
 }
 
 // Arithmatic
