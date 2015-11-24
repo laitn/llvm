@@ -25,6 +25,8 @@ let Namespace = "Vanilla" in {
 // General purpos register
 def GPR : RegisterClass<"Vanilla", [i32], 32, (sequence "R%u", 0, 31)>;
 
+def GPR_SUB1 : RegisterClass<"Vanilla", [i32], 32, (add R1)>;
+
 // Constant register
 def CR : RegisterClass<"Vanilla", [i32], 32, (sequence "R%u", 32, 63)>;
 

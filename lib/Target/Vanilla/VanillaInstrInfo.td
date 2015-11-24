@@ -127,7 +127,7 @@ class REG2_1<bits<5> Op, string OpcodeStr, list<dag> Pattern>
 }
 
 class REG1_BRANCH11<bits<5> Op, string OpcodeStr, PatLeaf Cond>
-: InstVanilla<(outs), (ins GPR:$rd, brtarget:$BrDst),
+: InstVanilla<(outs), (ins GPR_SUB1:$rd, brtarget:$BrDst),
               !strconcat(OpcodeStr, "\t$rd, 0, goto $BrDst"), [(Vanillabrcc i32:$rd, Cond, bb:$BrDst)]> {
   bits<11> BrDst;
   
@@ -145,7 +145,7 @@ class BRANCH11<bits<5> Op, string OpcodeStr, list<dag> Pattern>
 }
 
 class REG1_OFFSET11<bits<5> Op, string OpcodeStr, list<dag> Pattern>
-: InstVanilla<(outs GPR:$dstReg), (ins simm11Op:$offset), !strconcat(OpcodeStr, "\t$dstReg, $offset"), Pattern>{
+: InstVanilla<(outs GPR_SUB1:$dstReg), (ins simm11Op:$offset), !strconcat(OpcodeStr, "\t$dstReg, $offset"), Pattern>{
   bits<11> offset;
   
   let Opcode=Op;
@@ -154,7 +154,7 @@ class REG1_OFFSET11<bits<5> Op, string OpcodeStr, list<dag> Pattern>
 }
 
 class REG2_OFFSET11<bits<5> Op, string OpcodeStr, list<dag> Pattern>
-: InstVanilla<(outs GPR:$dstReg), (ins GPR:$srcReg, simm11Op:$offset), !strconcat(OpcodeStr, "\t$dstReg, $srcReg, $offset"), Pattern>{
+: InstVanilla<(outs GPR_SUB1:$dstReg), (ins GPR_SUB1:$srcReg, simm11Op:$offset), !strconcat(OpcodeStr, "\t$dstReg, $srcReg, $offset"), Pattern>{
   bits<11> offset;
   
   let Opcode=Op;
