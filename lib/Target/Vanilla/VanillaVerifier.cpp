@@ -52,9 +52,8 @@ namespace {
       Subtarget = &F.getSubtarget<VanillaSubtarget>();
       for (MachineFunction::iterator FI = F.begin(), FE = F.end();
            FI != FE; ++FI){
-        //Changed |= runOnMachineBasicBlock_regalloc(*FI);
+        Changed |= runOnMachineBasicBlock_regalloc(*FI);
       }
-      // 2nd pass -- add program terminator to signal hardware.
       if(F.getName().compare("main")==0){
         for (MachineFunction::iterator FI = F.begin(), FE = F.end();
              FI != FE; ++FI)
@@ -102,23 +101,18 @@ bool VanillaVerifier::runOnMachineBasicBlock_regalloc(MachineBasicBlock &MBB){
       Changed=true;
       continue;
     }
-    else if(MI->getNumOperands()==3
-         && MI->getOperand(0).isReg()
-         && MI->getOperand(1).isReg()
-         && MI->getOperand(2).isReg()
-         && MI->getOperand(0).getReg()!=MI->getOperand(1).getReg()){
-      llvm_unreachable("two address should be handled by api.");
-      // rd = rds op rs
+    else if(MI->getOpcode()==Vanilla::APPI
+            && (MI->getOperand(0).getReg()!=Vanilla::R1 || MI->getOperand(1).getReg()!=Vanilla::R1)){
+      // appi rx,rx, imm
       // --->
-      // mov r1, rds
-      // r1 =r1, rs
-      // mov rd, r1
+      // mov  r1,rx
+      // appi r1,r1, imm
+      // mov  rx,r1
       BuildMI(MBB, I, I->getDebugLoc(), TII->get(Vanilla::MOV), Vanilla::R1).addReg(MI->getOperand(1).getReg());
       I++;
       assert(
              (MI->getOperand(0).getReg()!=Vanilla::R1
-              && MI->getOperand(1).getReg()!=Vanilla::R1
-              && MI->getOperand(2).getReg()!=Vanilla::R1)
+              && MI->getOperand(1).getReg()!=Vanilla::R1)
              && "R1 is already used.");
       if(I!=MBB.end()){
         BuildMI(MBB, I, I->getDebugLoc(), TII->get(Vanilla::MOV), MI->getOperand(0).getReg()).addReg(Vanilla::R1);
@@ -126,24 +120,6 @@ bool VanillaVerifier::runOnMachineBasicBlock_regalloc(MachineBasicBlock &MBB){
       else{
         BuildMI(&MBB, MI->getDebugLoc(), TII->get(Vanilla::MOV), MI->getOperand(0).getReg()).addReg(Vanilla::R1);
       }
-      MI->getOperand(0).setReg(Vanilla::R1);
-      MI->getOperand(1).setReg(Vanilla::R1);
-      transform++;
-      Changed=true;
-      continue;
-    }
-    else if(MI->getOpcode()==Vanilla::APPI
-            && (MI->getOperand(0).getReg()!=Vanilla::R1 || MI->getOperand(1).getReg()!=Vanilla::R1)){
-      // appi rx,rx, imm
-      // --->
-      // mov  r1,rx
-      // appi r1,r1, imm
-      BuildMI(MBB, I, I->getDebugLoc(), TII->get(Vanilla::MOV), Vanilla::R1).addReg(MI->getOperand(1).getReg());
-      I++;
-      assert(
-             (MI->getOperand(0).getReg()!=Vanilla::R1
-              && MI->getOperand(1).getReg()!=Vanilla::R1)
-             && "R1 is already used.");
       MI->getOperand(0).setReg(Vanilla::R1);
       MI->getOperand(1).setReg(Vanilla::R1);
       transform++;
