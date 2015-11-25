@@ -107,6 +107,7 @@ bool VanillaVerifier::runOnMachineBasicBlock_regalloc(MachineBasicBlock &MBB){
          && MI->getOperand(1).isReg()
          && MI->getOperand(2).isReg()
          && MI->getOperand(0).getReg()!=MI->getOperand(1).getReg()){
+      llvm_unreachable("two address should be handled by api.");
       // rd = rds op rs
       // --->
       // mov r1, rds
@@ -133,23 +134,16 @@ bool VanillaVerifier::runOnMachineBasicBlock_regalloc(MachineBasicBlock &MBB){
     }
     else if(MI->getOpcode()==Vanilla::APPI
             && (MI->getOperand(0).getReg()!=Vanilla::R1 || MI->getOperand(1).getReg()!=Vanilla::R1)){
-      // appi ry,rx, imm
+      // appi rx,rx, imm
       // --->
       // mov  r1,rx
       // appi r1,r1, imm
-      // mov  ry,r1
       BuildMI(MBB, I, I->getDebugLoc(), TII->get(Vanilla::MOV), Vanilla::R1).addReg(MI->getOperand(1).getReg());
       I++;
       assert(
              (MI->getOperand(0).getReg()!=Vanilla::R1
               && MI->getOperand(1).getReg()!=Vanilla::R1)
              && "R1 is already used.");
-      if(I!=MBB.end()){
-        BuildMI(MBB, I, I->getDebugLoc(), TII->get(Vanilla::MOV), MI->getOperand(0).getReg()).addReg(Vanilla::R1);
-      }
-      else{
-        BuildMI(&MBB, MI->getDebugLoc(), TII->get(Vanilla::MOV), MI->getOperand(0).getReg()).addReg(Vanilla::R1);
-      }
       MI->getOperand(0).setReg(Vanilla::R1);
       MI->getOperand(1).setReg(Vanilla::R1);
       transform++;

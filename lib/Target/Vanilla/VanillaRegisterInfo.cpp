@@ -43,7 +43,7 @@ VanillaRegisterInfo::getCallPreservedMask(const MachineFunction &MF,
 
 BitVector VanillaRegisterInfo::getReservedRegs(const MachineFunction &MF) const {
   BitVector Reserved(getNumRegs());
-  //Reserved.set(Vanilla::R1);//temporary reg
+  Reserved.set(Vanilla::R1);//temporary reg
   Reserved.set(Vanilla::R0);//frame pointer
   Reserved.set(Vanilla::R3);//stack pointer
   return Reserved;
