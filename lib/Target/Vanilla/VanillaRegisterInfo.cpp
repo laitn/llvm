@@ -53,6 +53,7 @@ void VanillaRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
                                           int SPAdj, unsigned FIOperandNum,
                                           RegScavenger *RS) const {
   assert(SPAdj == 0 && "Unexpected");
+  //errs()<<II->getParent()->getParent()->getName()<<":--"; II->dump();
   
   unsigned i = 0;
   MachineInstr &MI = *II;

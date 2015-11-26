@@ -486,9 +486,9 @@ SDValue VanillaTargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
       int loc_id=MFI->CreateStackObject(4, 4, false);
       //SDValue StackPtr = DAG.getRegister(Vanilla::R3, MVT::i32);
       SDValue StackPtr = DAG.getTargetFrameIndex(loc_id, MVT::i32);
-      SDValue PtrOff = DAG.getIntPtrConstant(VA.getLocMemOffset(),dl);
-      PtrOff = DAG.getNode(ISD::ADD, dl, MVT::i32, StackPtr, PtrOff);
-      MemOpChains.push_back(DAG.getStore(Chain, dl, Arg, PtrOff,
+      //SDValue PtrOff = DAG.getIntPtrConstant(VA.getLocMemOffset(),dl);
+      //PtrOff = DAG.getNode(ISD::ADD, dl, MVT::i32, StackPtr, PtrOff);
+      MemOpChains.push_back(DAG.getStore(Chain, dl, Arg, StackPtr,
                                        MachinePointerInfo(),
                                        false, false, 0));
     }
